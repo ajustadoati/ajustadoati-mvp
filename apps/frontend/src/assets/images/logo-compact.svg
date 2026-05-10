@@ -1,0 +1,30 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="compactGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="compactCenter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main circle -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="url(#compactGradient)" stroke-width="8"/>
+
+  <!-- Center element -->
+  <circle cx="60" cy="60" r="20" fill="url(#compactCenter)"/>
+  
+  <!-- Tools icon -->
+  <g transform="translate(60, 60)">
+    <!-- Simplified tools icon -->
+    <path d="M-6,-6 L-6,6 L0,6 L0,0 L6,0 L6,-6 Z" fill="white" opacity="0.9"/>
+    <path d="M0,-6 L6,-6 L6,0 L0,0 L0,6 L-6,6 L-6,0 Z" fill="white" opacity="0.7"/>
+  </g>
+
+  <!-- Handle -->
+  <rect x="85" y="85" width="12" height="30" rx="6" fill="url(#compactGradient)" transform="rotate(45 91 100)" opacity="0.8"/>
+</svg>

@@ -1,0 +1,167 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" fill="clear">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Mis Solicitudes</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="navigateToProfile()" fill="clear">
+        <ion-icon name="person-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <!-- Filtros -->
+  <ion-toolbar>
+    <ion-segment [(ngModel)]="selectedFilter" (ionChange)="onFilterChange($event)" mode="md">
+      <ion-segment-button value="all">
+        <ion-label>Todas</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="active">
+        <ion-label>En curso</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="completed">
+        <ion-label>Historial</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="requests-content">
+  <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-refresher-content
+      pullingIcon="chevron-down-circle-outline"
+      pullingText="Desliza para actualizar"
+      refreshingSpinner="circles"
+      refreshingText="Actualizando...">
+    </ion-refresher-content>
+  </ion-refresher>
+
+  <!-- Header with user request statistics -->
+  <div class="stats-header" *ngIf="requestStats.total > 0">
+    <ion-card class="stats-card">
+      <ion-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-number">{{ requestStats.total }}</span>
+            <span class="stat-label">Total</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number active">{{ requestStats.active }}</span>
+            <span class="stat-label">Activas</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number completed">{{ requestStats.completed }}</span>
+            <span class="stat-label">Completadas</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="filteredRequests.length === 0" class="empty-state">
+    <ion-card class="empty-state-card">
+      <ion-card-content>
+        <div class="empty-content">
+          <ion-icon name="document-text-outline" size="large" color="medium"></ion-icon>
+          <h2 *ngIf="selectedFilter === 'all'">No tienes solicitudes</h2>
+          <h2 *ngIf="selectedFilter === 'active'">No tienes solicitudes en curso</h2>
+          <h2 *ngIf="selectedFilter === 'completed'">No tienes historial</h2>
+          <p *ngIf="selectedFilter === 'all'">Cuando realices solicitudes de servicio, apareceran aqui</p>
+          <p *ngIf="selectedFilter === 'active'">Las busquedas esperando respuesta y servicios aceptados apareceran aqui</p>
+          <p *ngIf="selectedFilter === 'completed'">Tus solicitudes completadas apareceran aqui</p>
+          <ion-button fill="outline" (click)="createNewRequest()">
+            <ion-icon name="add-outline" slot="start"></ion-icon>
+            Nueva Solicitud
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Requests List -->
+  <div class="requests-list" *ngIf="filteredRequests.length > 0">
+    <ion-card
+      *ngFor="let request of filteredRequests; trackBy: trackByRequestId"
+      class="request-card"
+      [class.active-request]="isActiveRequest(request)"
+      (click)="viewRequestDetails(request)"
+    >
+      <ion-card-content>
+        <div class="request-header">
+          <div class="request-info">
+            <ion-badge [color]="getStatusColor(request.status)">
+              {{ getStatusLabel(request.status) }}
+            </ion-badge>
+            <span class="request-date">{{ getFormattedDate(request.createdAt) }}</span>
+          </div>
+        </div>
+
+        <div class="request-category">
+          <ion-icon name="construct-outline"></ion-icon>
+          <span>{{ request.categoryName }}</span>
+        </div>
+
+        <p class="request-description">{{ request.description }}</p>
+
+        <div class="request-meta">
+          <span>
+            <ion-icon name="location-outline"></ion-icon>
+            {{ request.location.address || (request.location.latitude.toFixed(4) + ', ' + request.location.longitude.toFixed(4)) }}
+          </span>
+          <span *ngIf="request.maxBudget">
+            <ion-icon name="cash-outline"></ion-icon>
+            ${{ request.maxBudget | number }}
+          </span>
+        </div>
+
+        <!-- Active request indicator -->
+        <div class="active-indicator" *ngIf="isActiveRequest(request)">
+          <ion-icon name="navigate-outline" color="primary"></ion-icon>
+          <span>Proveedor en camino</span>
+          <ion-icon name="chevron-forward-outline"></ion-icon>
+        </div>
+
+        <!-- Waiting responses indicator -->
+        <div class="waiting-indicator" *ngIf="isWaitingRequest(request)">
+          <ion-icon name="hourglass-outline" color="tertiary"></ion-icon>
+          <span>{{ request.responses.length || 0 }} respuestas</span>
+          <ion-icon name="chevron-forward-outline"></ion-icon>
+        </div>
+
+        <!-- Action buttons for non-active requests -->
+        <div class="action-buttons" *ngIf="!isActiveRequest(request)" (click)="$event.stopPropagation()">
+          <ion-button
+            fill="clear"
+            size="small"
+            color="danger"
+            (click)="cancelRequest(request)"
+            *ngIf="isWaitingRequest(request)"
+          >
+            <ion-icon name="close-outline" slot="start"></ion-icon>
+            Cancelar
+          </ion-button>
+          <ion-button
+            fill="clear"
+            size="small"
+            (click)="repeatRequest(request)"
+            *ngIf="isClosedRequest(request)"
+          >
+            <ion-icon name="refresh-outline" slot="start"></ion-icon>
+            Repetir
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Floating Action Button -->
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="createNewRequest()" color="primary">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+</ion-content>

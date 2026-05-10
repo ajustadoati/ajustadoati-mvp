@@ -1,0 +1,18 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/ajustadoati/ajustadoati-backend:latest}
+    container_name: ajustadoati-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.production
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8080
+    ports:
+      - "127.0.0.1:8086:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s

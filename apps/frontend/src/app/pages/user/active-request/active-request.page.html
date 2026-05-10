@@ -1,0 +1,209 @@
+<ion-header class="active-request-header">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button class="back-button" (click)="goBack()" fill="clear" aria-label="Volver">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Servicio en Curso</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="active-request-content">
+  <!-- No Active Request -->
+  <div class="no-request" *ngIf="!activeRequest">
+    <ion-card class="empty-state-card">
+      <ion-card-content>
+        <div class="empty-state">
+          <ion-icon name="document-text-outline" size="large" color="medium"></ion-icon>
+          <h2>No hay solicitud activa</h2>
+          <p>No tienes ninguna solicitud de servicio en curso</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="home-outline" slot="start"></ion-icon>
+            Ir al Inicio
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Active Request Content -->
+  <div class="request-content" *ngIf="activeRequest && acceptedOffer">
+    <!-- Status Header -->
+    <div class="status-header">
+      <div class="status-icon-container" [attr.data-status]="currentJobStatus">
+        <ion-icon [name]="getStatusIcon()" [color]="getStatusColor()"></ion-icon>
+      </div>
+      <div class="status-info">
+        <h2>{{ getStatusText() }}</h2>
+        <p *ngIf="!isCompletedView && etaMinutes !== null && etaMinutes > 0">
+          Tiempo estimado: {{ etaDisplay }}
+        </p>
+        <p *ngIf="!isCompletedView && etaMinutes === 0">
+          El proveedor esta llegando
+        </p>
+        <p *ngIf="isCompletedView">
+          Confirma el cierre y deja la valoracion cuando este disponible
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+      <div class="step" [class.active]="currentJobStatus === 'en_route'" [class.completed]="['arriving', 'on_site', 'working', 'completed'].includes(currentJobStatus)">
+        <div class="step-icon">
+          <ion-icon name="car-outline"></ion-icon>
+        </div>
+        <span>En camino</span>
+      </div>
+      <div class="step-line" [class.completed]="['arriving', 'on_site', 'working', 'completed'].includes(currentJobStatus)"></div>
+      <div class="step" [class.active]="currentJobStatus === 'arriving'" [class.completed]="['on_site', 'working', 'completed'].includes(currentJobStatus)">
+        <div class="step-icon">
+          <ion-icon name="navigate-outline"></ion-icon>
+        </div>
+        <span>Llegando</span>
+      </div>
+      <div class="step-line" [class.completed]="['on_site', 'working', 'completed'].includes(currentJobStatus)"></div>
+      <div class="step" [class.active]="['on_site', 'working'].includes(currentJobStatus)" [class.completed]="currentJobStatus === 'completed'">
+        <div class="step-icon">
+          <ion-icon name="construct-outline"></ion-icon>
+        </div>
+        <span>En sitio</span>
+      </div>
+      <div class="step-line" [class.completed]="currentJobStatus === 'completed'"></div>
+      <div class="step" [class.active]="currentJobStatus === 'completed'" [class.completed]="currentJobStatus === 'completed'">
+        <div class="step-icon">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+        </div>
+        <span>Listo</span>
+      </div>
+    </div>
+
+    <!-- Map Placeholder -->
+    <div class="map-section">
+      <ion-card class="map-card">
+        <ion-card-content>
+          <div class="map-placeholder">
+            <ion-icon name="map-outline" color="primary"></ion-icon>
+            <p>Tu ubicacion</p>
+            <span class="location-address" *ngIf="activeRequest.location.address">
+              {{ activeRequest.location.address }}
+            </span>
+            <span class="location-coords" *ngIf="!activeRequest.location.address">
+              {{ activeRequest.location.latitude.toFixed(4) }}, {{ activeRequest.location.longitude.toFixed(4) }}
+            </span>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- Provider Info -->
+    <ion-card class="provider-card">
+      <ion-card-content>
+        <div class="provider-header">
+          <div class="provider-avatar">
+            <ion-icon name="person-circle-outline"></ion-icon>
+          </div>
+          <div class="provider-details">
+            <h3>{{ acceptedOffer.providerName }}</h3>
+            <p>{{ acceptedOffer.providerEmail }}</p>
+            <div class="provider-meta" *ngIf="acceptedOffer.agreedPrice">
+              <ion-badge color="success">
+                <ion-icon name="cash-outline"></ion-icon>
+                ${{ acceptedOffer.agreedPrice | number }}
+              </ion-badge>
+            </div>
+          </div>
+        </div>
+
+        <!-- Service Description -->
+        <div class="service-info">
+          <ion-chip color="primary" size="small">
+            {{ activeRequest.categoryName }}
+          </ion-chip>
+          <p class="service-description">{{ activeRequest.description }}</p>
+        </div>
+
+        <!-- Contact Actions -->
+        <div class="contact-actions">
+          <ion-button
+            fill="solid"
+            color="success"
+            expand="block"
+            (click)="callProvider()"
+          >
+            <ion-icon name="call-outline" slot="start"></ion-icon>
+            Llamar
+          </ion-button>
+          <ion-button
+            fill="outline"
+            color="success"
+            expand="block"
+            (click)="openWhatsApp()"
+          >
+            <ion-icon name="logo-whatsapp" slot="start"></ion-icon>
+            WhatsApp
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Completion Actions -->
+    <ion-card class="completion-card" [class.confirmed]="isCompletedView">
+      <ion-card-content>
+        <div class="completion-header">
+          <div class="completion-icon">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+          </div>
+          <div>
+            <h3>{{ isCompletedView ? 'Servicio terminado' : 'Cuando el trabajo termine' }}</h3>
+            <p>
+              {{ isCompletedView ? 'Ya queda listo para valorar y cerrar cuando activemos ese flujo.' : 'Confirma el fin del servicio cuando el proveedor haya terminado.' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="completion-actions">
+          <ion-button
+            expand="block"
+            color="success"
+            type="button"
+            [disabled]="isCompletedView"
+            (click)="confirmServiceFinished()"
+          >
+            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+            Confirmar que termino
+          </ion-button>
+
+          <ion-button
+            expand="block"
+            color="primary"
+            type="button"
+            [disabled]="!isCompletedView"
+            (click)="closeCompletedRequest()"
+          >
+            <ion-icon name="star-outline" slot="start"></ion-icon>
+            Valorar y cerrar
+          </ion-button>
+        </div>
+
+        <p class="mvp-note">
+          La valoracion queda como placeholder para el MVP; al cerrar, la solicitud pasa al historial.
+        </p>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Cancel Button -->
+    <div class="cancel-section" *ngIf="!isCompletedView">
+      <ion-button
+        fill="clear"
+        color="danger"
+        expand="block"
+        (click)="cancelRequest()"
+      >
+        <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+        Cancelar Solicitud
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

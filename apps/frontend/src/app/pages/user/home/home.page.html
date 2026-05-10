@@ -1,0 +1,170 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>AjustadoATi</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="navigateToRequests()" fill="clear">
+        <ion-icon name="document-text-outline"></ion-icon>
+        <ion-badge *ngIf="hasActiveSearch || hasAcceptedOffer" color="success" class="active-badge">1</ion-badge>
+      </ion-button>
+      <ion-button (click)="showUserMenu()" fill="clear">
+        <ion-icon name="person-circle-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="home-content">
+  <!-- Main Form Section -->
+  <div class="main-form-section">
+    <div class="welcome-header">
+      <h1>Hola {{ user?.fullName || 'Usuario' }}!</h1>
+      <p>Elige una categoria, describe lo que necesitas y avisamos a proveedores cercanos</p>
+    </div>
+
+    <ion-card class="service-form-card">
+      <ion-card-content>
+        <form [formGroup]="serviceForm" (ngSubmit)="onServiceSubmit()">
+          <!-- Category Selection -->
+          <ion-item fill="outline" class="form-item">
+            <ion-label position="floating">Categoria del servicio</ion-label>
+            <ion-select
+              formControlName="category"
+              interface="popover"
+              placeholder="Selecciona una categoria"
+              [disabled]="loadingCategories || serviceCategories.length === 0"
+            >
+              <ion-select-option
+                *ngFor="let category of serviceCategories"
+                [value]="category.id"
+              >
+                {{ category.name }}
+              </ion-select-option>
+            </ion-select>
+            <ion-spinner *ngIf="loadingCategories" name="crescent" slot="end"></ion-spinner>
+            <ion-note slot="helper">Por ahora usamos categorias basicas para validar el MVP</ion-note>
+          </ion-item>
+
+          <!-- Service Description -->
+          <ion-item fill="outline" class="form-item">
+            <ion-label position="floating">Que necesitas?</ion-label>
+            <ion-textarea
+              formControlName="serviceDescription"
+              placeholder="Ej: reparar una lavadora que no centrifuga"
+              rows="3"
+              maxlength="180"
+              [counter]="true"
+            ></ion-textarea>
+          </ion-item>
+
+          <!-- Urgency Selection -->
+          <div class="urgency-section">
+            <ion-label class="section-label">Cuando lo necesitas?</ion-label>
+            <div class="urgency-chips">
+              <ion-chip
+                *ngFor="let option of urgencyOptions"
+                [color]="serviceForm.get('urgency')?.value === option.value ? option.color : 'medium'"
+                [outline]="serviceForm.get('urgency')?.value !== option.value"
+                (click)="serviceForm.patchValue({urgency: option.value})"
+              >
+                <ion-icon [name]="option.icon"></ion-icon>
+                <ion-label>{{ option.label }}</ion-label>
+              </ion-chip>
+            </div>
+          </div>
+
+          <!-- Max Budget (Optional) -->
+          <ion-item fill="outline" class="form-item">
+            <ion-label position="floating">Presupuesto maximo (opcional)</ion-label>
+            <ion-input
+              formControlName="maxBudget"
+              type="number"
+              placeholder="Ej: 50000"
+              inputmode="numeric"
+            ></ion-input>
+            <ion-note slot="helper">Deja en blanco si no tienes un limite</ion-note>
+          </ion-item>
+
+          <!-- Location Status with Mini-map Indicator -->
+          <div class="location-section">
+            <ion-label class="section-label">Tu ubicacion</ion-label>
+            <div class="location-status" (click)="refreshLocation()">
+              <div class="location-icon-container">
+                <ion-icon
+                  [name]="isLocationLoading ? 'hourglass-outline' : 'location'"
+                  [color]="currentPosition ? 'success' : 'medium'"
+                ></ion-icon>
+              </div>
+              <div class="location-details">
+                <span class="location-text">{{ locationText }}</span>
+                <span class="location-hint" *ngIf="currentPosition">
+                  Los proveedores veran esta ubicacion
+                </span>
+              </div>
+              <ion-icon name="refresh-outline" color="primary" class="refresh-icon"></ion-icon>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <ion-button
+            expand="block"
+            type="submit"
+            class="search-button"
+            [disabled]="serviceForm.invalid || isLoading || !currentPosition"
+          >
+            <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
+            <ion-icon name="search-outline" slot="start" *ngIf="!isLoading"></ion-icon>
+            <span *ngIf="!isLoading">Buscar Proveedores</span>
+            <span *ngIf="isLoading">Buscando...</span>
+          </ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Active Search Alert -->
+  <div class="active-search-section" *ngIf="hasActiveSearch && !hasAcceptedOffer">
+    <ion-card class="active-search-alert" (click)="router.navigate(['/user/waiting-responses'])">
+      <ion-card-content>
+        <div class="alert-content">
+          <ion-icon name="pulse-outline" color="success"></ion-icon>
+          <div class="alert-text">
+            <h3>Busqueda en Progreso</h3>
+            <p>Toca para ver las respuestas de proveedores</p>
+          </div>
+          <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Active Request Alert (Offer Accepted) -->
+  <div class="active-search-section" *ngIf="hasAcceptedOffer">
+    <ion-card class="active-request-alert" (click)="navigateToActiveRequest()">
+      <ion-card-content>
+        <div class="alert-content">
+          <ion-icon name="car-outline" color="warning"></ion-icon>
+          <div class="alert-text">
+            <h3>Servicio en Curso</h3>
+            <p>Tu proveedor esta en camino</p>
+          </div>
+          <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions-section" *ngIf="!hasActiveSearch && !hasAcceptedOffer">
+    <div class="quick-actions">
+      <ion-button
+        fill="clear"
+        size="small"
+        class="quick-action-button"
+        (click)="navigateToRequests()"
+      >
+        <ion-icon name="document-text-outline" slot="start"></ion-icon>
+        Ver mis solicitudes
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

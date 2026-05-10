@@ -1,0 +1,129 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" fill="clear">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>
+      <strong>👤 Mi Perfil</strong>
+    </ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="navigateToSearch()" fill="clear">
+        <ion-icon name="search-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="navigateToRequests()" fill="clear">
+        <ion-icon name="document-text-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="profile-content">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-container">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
+    <p>Cargando perfil...</p>
+  </div>
+
+  <!-- Profile Content -->
+  <div *ngIf="!isLoading && userProfile" class="profile-container">
+    <!-- Avatar Card -->
+    <ion-card class="avatar-card">
+      <ion-card-content>
+        <div class="avatar-section">
+          <div class="avatar-placeholder">
+            <ion-icon name="person" size="large"></ion-icon>
+          </div>
+          <h2>{{ userProfile?.full_name || 'Usuario' }}</h2>
+          <p class="email">{{ userProfile?.email }}</p>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Account Info Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="information-circle-outline"></ion-icon>
+          Información de la Cuenta
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="none">
+          <ion-item>
+            <ion-icon name="mail-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3>Email</h3>
+              <p>{{ userProfile?.email }}</p>
+            </ion-label>
+          </ion-item>
+
+          <ion-item *ngIf="userProfile?.phone">
+            <ion-icon name="call-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3>Teléfono</h3>
+              <p>{{ userProfile?.phone }}</p>
+            </ion-label>
+          </ion-item>
+
+          <ion-item>
+            <ion-icon name="shield-checkmark-outline" slot="start" color="success"></ion-icon>
+            <ion-label>
+              <h3>Tipo de Cuenta</h3>
+              <p>{{ userProfile?.is_provider ? 'Proveedor' : 'Usuario' }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Actions Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="settings-outline"></ion-icon>
+          Acciones
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-button expand="block" fill="outline" (click)="editProfile()">
+          <ion-icon name="create-outline" slot="start"></ion-icon>
+          Editar Perfil
+        </ion-button>
+
+        <ion-button expand="block" fill="outline" (click)="viewHistory()">
+          <ion-icon name="time-outline" slot="start"></ion-icon>
+          Historial de Solicitudes
+        </ion-button>
+
+        <ion-button expand="block" fill="outline" (click)="viewSettings()">
+          <ion-icon name="settings-outline" slot="start"></ion-icon>
+          Configuración
+        </ion-button>
+
+        <ion-button expand="block" color="danger" (click)="logout()">
+          <ion-icon name="power" slot="start"></ion-icon>
+          Cerrar Sesión
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- No Profile State -->
+  <div *ngIf="!isLoading && !userProfile" class="no-profile">
+    <ion-card>
+      <ion-card-content>
+        <div class="empty-state">
+          <ion-icon name="person-outline" size="large" color="medium"></ion-icon>
+          <h2>No se pudo cargar el perfil</h2>
+          <p>Intenta cerrar sesión e iniciar de nuevo</p>
+          <ion-button fill="outline" (click)="logout()">
+            <ion-icon name="log-out-outline" slot="start"></ion-icon>
+            Cerrar Sesión
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

@@ -1,0 +1,136 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" fill="clear">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Trabajo Activo</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="active-job-content">
+  <!-- No Active Job -->
+  <div class="no-job" *ngIf="!activeJob">
+    <ion-card class="empty-state-card">
+      <ion-card-content>
+        <div class="empty-state">
+          <ion-icon name="briefcase-outline" size="large" color="medium"></ion-icon>
+          <h2>No hay trabajo activo</h2>
+          <p>No tienes ningun trabajo en curso</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="home-outline" slot="start"></ion-icon>
+            Volver al Inicio
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Active Job Content -->
+  <div class="job-content" *ngIf="activeJob">
+    <!-- Status Header -->
+    <div class="status-header">
+      <div class="status-icon-container" [attr.data-status]="activeJob.status">
+        <ion-icon [name]="getStatusIcon()" [color]="getStatusColor()"></ion-icon>
+      </div>
+      <div class="status-info">
+        <h2>{{ getStatusText() }}</h2>
+        <p>{{ activeJob.categoryName }}</p>
+      </div>
+    </div>
+
+    <!-- Map Section -->
+    <div class="map-section">
+      <ion-card class="map-card">
+        <ion-card-content>
+          <div class="map-placeholder">
+            <ion-icon name="location-outline" color="danger"></ion-icon>
+            <p>Ubicacion del Cliente</p>
+            <span class="location-address" *ngIf="activeJob.clientLocation.address">
+              {{ activeJob.clientLocation.address }}
+            </span>
+            <span class="location-coords" *ngIf="!activeJob.clientLocation.address">
+              {{ activeJob.clientLocation.latitude.toFixed(4) }}, {{ activeJob.clientLocation.longitude.toFixed(4) }}
+            </span>
+          </div>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Navigation Buttons -->
+      <div class="navigation-buttons">
+        <ion-button expand="block" fill="solid" color="primary" (click)="openNavigation()">
+          <ion-icon name="navigate-outline" slot="start"></ion-icon>
+          Abrir en Google Maps
+        </ion-button>
+        <ion-button expand="block" fill="outline" color="primary" (click)="openWaze()">
+          <ion-icon name="car-outline" slot="start"></ion-icon>
+          Abrir en Waze
+        </ion-button>
+      </div>
+    </div>
+
+    <!-- Client Info -->
+    <ion-card class="client-card">
+      <ion-card-content>
+        <div class="client-header">
+          <div class="client-avatar">
+            <ion-icon name="person-circle-outline"></ion-icon>
+          </div>
+          <div class="client-details">
+            <h3>{{ activeJob.clientName }}</h3>
+            <p *ngIf="activeJob.clientPhone">{{ activeJob.clientPhone }}</p>
+          </div>
+        </div>
+
+        <!-- Service Description -->
+        <div class="service-info">
+          <p class="service-description">{{ activeJob.description }}</p>
+          <div class="service-meta" *ngIf="activeJob.agreedPrice">
+            <ion-badge color="success">
+              <ion-icon name="cash-outline"></ion-icon>
+              ${{ activeJob.agreedPrice | number }}
+            </ion-badge>
+          </div>
+        </div>
+
+        <!-- Contact Actions -->
+        <div class="contact-actions">
+          <ion-button fill="solid" color="success" (click)="callClient()">
+            <ion-icon name="call-outline" slot="start"></ion-icon>
+            Llamar
+          </ion-button>
+          <ion-button fill="outline" color="success" (click)="openWhatsApp()">
+            <ion-icon name="logo-whatsapp" slot="start"></ion-icon>
+            WhatsApp
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <ion-button
+        expand="block"
+        fill="solid"
+        color="warning"
+        *ngIf="activeJob.status === 'en_route'"
+        (click)="markArrived()"
+      >
+        <ion-icon name="flag-outline" slot="start"></ion-icon>
+        He Llegado
+      </ion-button>
+
+      <ion-button
+        expand="block"
+        fill="solid"
+        color="success"
+        *ngIf="activeJob.status === 'on_site' || activeJob.status === 'working'"
+        (click)="markCompleted()"
+      >
+        <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+        Trabajo Completado
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

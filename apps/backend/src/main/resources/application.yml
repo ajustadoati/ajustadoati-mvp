@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: ajustadoati-core
+
+  # Configuración de base de datos (Supabase PostgreSQL)
+  datasource:
+    url: jdbc:postgresql://${SUPABASE_DB_HOST:aws-0-eu-west-1.pooler.supabase.com}:5432/${SUPABASE_DB_NAME:postgres}?sslmode=require
+    username: ${SUPABASE_DB_USER:postgres.ialorxfzvtwiebhfgzqv}
+    password: ${SUPABASE_DB_PASSWORD:wpgBVmSqDQwy6Cn0}
+    driver-class-name: org.postgresql.Driver
+
+  # JPA/Hibernate configuración
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # Security configuración
+  security:
+    jwt: #wJ9mN7rG2uY9pT3xQ8bR6sL2zC5vW1tE4yK7aH9dM3nQ6oP8uR2cJ5fL1eD7bS9g #/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==
+      secret: ${JWT_SECRET:/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==}
+      expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==}
+  expiration: ${JWT_EXPIRATION:86400000} # 24 hours
+
+# Server configuración
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api
+
+# Logging configuración
+logging:
+  level:
+    com.ajustadoati.core: ${LOG_LEVEL:DEBUG}
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.web.socket: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Documentación API
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# CORS configuración
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:4200,http://localhost:8100,chrome-extension://gobngblklhkgmjhbpbdlkglbhhlafjnh}
+  allowed-methods: ${ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+  allowed-headers: ${ALLOWED_HEADERS:*,Authorization,X-Auth-Token}
+
+---
+# Perfil de desarrollo
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://${DEV_DB_HOST:localhost}:${DEV_DB_PORT:5432}/${DEV_DB_NAME:ajustadoati_dev}?sslmode=disable
+    username: ${DEV_DB_USER:postgres}
+    password: ${DEV_DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+supabase:
+  url: http://localhost:54321
+
+logging:
+  level:
+    com.ajustadoati.core: DEBUG
+
+---
+# Perfil de producción
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    com.ajustadoati.core: WARN

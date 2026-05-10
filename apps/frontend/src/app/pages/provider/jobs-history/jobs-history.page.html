@@ -1,0 +1,120 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()">
+        <ion-icon slot="icon-only" name="arrow-back"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Historial de Trabajos</ion-title>
+  </ion-toolbar>
+
+  <!-- Filtros -->
+  <ion-toolbar>
+    <ion-segment [(ngModel)]="selectedFilter" (ionChange)="onFilterChange($event)" mode="md">
+      <ion-segment-button value="today">
+        <ion-label>Hoy</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="week">
+        <ion-label>Semana</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="month">
+        <ion-label>Mes</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="jobs-history-content">
+  <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-refresher-content
+      pullingIcon="chevron-down-circle-outline"
+      pullingText="Desliza para actualizar"
+      refreshingSpinner="circles"
+      refreshingText="Actualizando...">
+    </ion-refresher-content>
+  </ion-refresher>
+
+  <!-- Stats Summary -->
+  <div class="stats-section">
+    <ion-card class="stats-card">
+      <ion-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number">{{ totalJobs }}</div>
+            <div class="stat-label">Trabajos</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">${{ totalEarnings | number }}</div>
+            <div class="stat-label">Ganancias</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">
+              {{ averageRating | number:'1.1-1' }}
+              <ion-icon name="star" color="warning"></ion-icon>
+            </div>
+            <div class="stat-label">Promedio</div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Jobs List -->
+  <div class="jobs-list" *ngIf="filteredJobs.length > 0; else noJobs">
+    <ion-card *ngFor="let job of filteredJobs" class="job-card">
+      <ion-card-content>
+        <div class="job-header">
+          <div class="job-info">
+            <ion-badge color="primary">{{ job.categoryName }}</ion-badge>
+            <span class="job-date">{{ getFormattedDate(job.completedAt) }}</span>
+          </div>
+          <div class="job-price" *ngIf="job.price">
+            ${{ job.price | number }}
+          </div>
+        </div>
+
+        <div class="job-client">
+          <ion-icon name="person-circle-outline"></ion-icon>
+          <span>{{ job.clientName }}</span>
+        </div>
+
+        <p class="job-description">{{ job.description }}</p>
+
+        <div class="job-rating" *ngIf="job.rating">
+          <div class="stars">
+            <ion-icon
+              *ngFor="let star of getStarArray(job.rating)"
+              [name]="star ? 'star' : 'star-outline'"
+              [color]="star ? 'warning' : 'medium'"
+            ></ion-icon>
+          </div>
+          <span class="rating-text" *ngIf="job.review">"{{ job.review }}"</span>
+        </div>
+
+        <div class="no-rating" *ngIf="!job.rating">
+          <ion-icon name="star-outline" color="medium"></ion-icon>
+          <span>Sin calificacion</span>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Empty State -->
+  <ng-template #noJobs>
+    <div class="empty-state">
+      <ion-card class="empty-state-card">
+        <ion-card-content>
+          <ion-icon name="briefcase-outline" size="large" color="medium"></ion-icon>
+          <h2>No hay trabajos</h2>
+          <p *ngIf="selectedFilter === 'today'">No has completado trabajos hoy</p>
+          <p *ngIf="selectedFilter === 'week'">No has completado trabajos esta semana</p>
+          <p *ngIf="selectedFilter === 'month'">No has completado trabajos este mes</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="home-outline" slot="start"></ion-icon>
+            Volver al Inicio
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </ng-template>
+</ion-content>

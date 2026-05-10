@@ -1,0 +1,12 @@
+node_modules/
+www/
+dist/
+.angular/
+coverage/
+out-tsc/
+.env
+.env.*
+.idea/
+.vscode/
+.claude/
+.DS_Store

@@ -1,0 +1,172 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()">
+        <ion-icon slot="icon-only" name="arrow-back"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Detalle de Solicitud</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="getDirections()" *ngIf="request">
+        <ion-icon slot="icon-only" name="navigate-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="content-container" *ngIf="request">
+    <!-- Request Info Card -->
+    <ion-card class="request-info-card">
+      <ion-card-header>
+        <div class="card-header">
+          <ion-badge color="primary">{{ request.categoryName }}</ion-badge>
+          <span class="request-time">{{ request.timestamp | date:'short' }}</span>
+        </div>
+      </ion-card-header>
+
+      <ion-card-content>
+        <h2 class="request-title">{{ request.message }}</h2>
+
+        <div class="client-info">
+          <div class="info-row">
+            <ion-icon name="person-circle-outline" color="primary"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">Cliente</span>
+              <span class="info-value">{{ request.fromUser }}</span>
+            </div>
+          </div>
+
+          <div class="info-row" *ngIf="currentPosition">
+            <ion-icon name="navigate-outline" color="success"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">Distancia</span>
+              <span class="info-value">{{ getDistanceKm() }} km</span>
+            </div>
+          </div>
+
+          <div class="info-row">
+            <ion-icon name="location-outline" color="tertiary"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">Ubicación</span>
+              <span class="info-value">{{ request.latitude.toFixed(4) }}, {{ request.longitude.toFixed(4) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <ion-button expand="block" fill="outline" size="small" (click)="callClient()">
+            <ion-icon slot="start" name="call-outline"></ion-icon>
+            Llamar Cliente
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Map Section -->
+    <ion-card class="map-card">
+      <ion-card-header>
+        <ion-card-title>Ubicación del Cliente</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div id="request-map" class="map-container"></div>
+        <div class="map-legend">
+          <div class="legend-item">
+            <div class="legend-marker client"></div>
+            <span>Cliente</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-marker provider"></div>
+            <span>Tu ubicación</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="response-sent-card" *ngIf="sentResponse">
+      <ion-card-content>
+        <div class="sent-state">
+          <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+          <div>
+            <h3>Respuesta enviada</h3>
+            <p>Esta solicitud ya salio de tus pendientes. Ahora queda esperando la decision del cliente.</p>
+            <span>{{ sentResponse.sentAt | date:'short' }}</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Response Form -->
+    <ion-card class="response-form-card" *ngIf="!sentResponse">
+      <ion-card-header>
+        <ion-card-title>Enviar Respuesta</ion-card-title>
+        <ion-card-subtitle>Proporciona detalles sobre tu servicio</ion-card-subtitle>
+      </ion-card-header>
+
+      <ion-card-content>
+        <form [formGroup]="responseForm">
+          <!-- Message -->
+          <ion-item lines="full" [class.ion-invalid]="message?.invalid && message?.touched">
+            <ion-label position="stacked">
+              Mensaje *
+              <ion-text color="danger" *ngIf="message?.invalid && message?.touched">
+                <p class="error-text">El mensaje debe tener al menos 10 caracteres</p>
+              </ion-text>
+            </ion-label>
+            <ion-textarea
+              formControlName="message"
+              placeholder="Ej: Hola, puedo ayudarte con este servicio. Tengo X años de experiencia..."
+              rows="4"
+              [counter]="true"
+              maxlength="500">
+            </ion-textarea>
+          </ion-item>
+
+          <!-- Estimated Time -->
+          <ion-item lines="full" [class.ion-invalid]="estimatedTime?.invalid && estimatedTime?.touched">
+            <ion-label position="stacked">
+              Tiempo Estimado *
+              <ion-text color="danger" *ngIf="estimatedTime?.invalid && estimatedTime?.touched">
+                <p class="error-text">Campo requerido</p>
+              </ion-text>
+            </ion-label>
+            <ion-input
+              formControlName="estimatedTime"
+              placeholder="Ej: 2-3 horas, 1 día, inmediato"
+              type="text">
+            </ion-input>
+          </ion-item>
+
+          <!-- Estimated Cost -->
+          <ion-item lines="none">
+            <ion-label position="stacked">
+              Costo Estimado (Opcional)
+            </ion-label>
+            <ion-input
+              formControlName="estimatedCost"
+              placeholder="Ej: $50-100, A cotizar"
+              type="text">
+            </ion-input>
+          </ion-item>
+
+          <!-- Send Button -->
+          <ion-button
+            expand="block"
+            [disabled]="responseForm.invalid || isSendingResponse"
+            (click)="sendResponse()"
+            class="send-button">
+            <ion-icon slot="start" name="send-outline"></ion-icon>
+            {{ isSendingResponse ? 'Enviando...' : 'Enviar Respuesta' }}
+          </ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Loading state if no request -->
+  <div class="empty-state" *ngIf="!request">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Cargando solicitud...</p>
+  </div>
+
+</ion-content>

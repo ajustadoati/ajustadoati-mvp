@@ -1,0 +1,133 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" fill="clear">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Mapa de Proveedores</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="map-content">
+  <!-- Content with Session or Location -->
+  <div class="content-container" *ngIf="currentSession || userLocation">
+    <!-- Guest User Info Banner -->
+    <ion-card class="guest-info-banner" *ngIf="currentSession && currentSession.providers.length > 0 && isGuestView">
+      <ion-card-content>
+        <div class="info-content">
+          <ion-icon name="information-circle-outline" color="primary"></ion-icon>
+          <div class="info-text">
+            <p><strong>Solicitud publica enviada:</strong> mostramos proveedores cercanos y aqui veras sus respuestas en tiempo real.</p>
+            <p class="small-text">
+              Proveedores notificados ahora: <strong>{{ notifiedProvidersCount }}</strong>.
+              Para aceptar una oferta y seguir el servicio completo, <a routerLink="/auth/register">crea una cuenta gratuita</a>.
+            </p>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Search Info Card (solo si hay sesión) -->
+    <ion-card class="search-info-card" *ngIf="currentSession">
+      <ion-card-content>
+        <div class="search-summary">
+          <h3>{{ currentSession.searchRequest.productName }}</h3>
+          <div class="stats-row">
+            <div class="stat-item">
+              <ion-icon name="business-outline" color="primary"></ion-icon>
+              <span>{{ providersCount }} proveedores</span>
+            </div>
+            <div class="stat-item" *ngIf="responsesCount > 0">
+              <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+              <span>{{ responsesCount }} respuestas</span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Map Card (siempre se muestra si hay ubicación) -->
+    <ion-card class="map-card">
+      <ion-card-header>
+        <ion-card-title>Ubicaciones</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div id="providers-map" class="map-container"></div>
+        <div class="map-legend">
+          <div class="legend-item">
+            <div class="legend-marker user"></div>
+            <span>Tu ubicación</span>
+          </div>
+          <div class="legend-item" *ngIf="currentSession && providersCount > 0">
+            <div class="legend-marker provider"></div>
+            <span>Proveedores</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Providers List Card -->
+    <ion-card class="providers-list-card" *ngIf="currentSession && providersCount > 0">
+      <ion-card-header>
+        <ion-card-title>Proveedores Encontrados</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="full">
+          <ion-item *ngFor="let provider of currentSession.providers; let i = index">
+            <ion-label>
+              <h3>{{ i + 1 }}. {{ provider.name }}</h3>
+              <p *ngIf="provider.locations && provider.locations.length > 0 && provider.locations[0].distance">
+                📍 {{ provider.locations[0].distance!.toFixed(1) }} km
+              </p>
+            </ion-label>
+            <ion-badge slot="end" *ngIf="provider.rating">
+              ⭐ {{ provider.rating!.toFixed(1) }}
+            </ion-badge>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="responses-list-card" *ngIf="currentSession && isGuestView">
+      <ion-card-header>
+        <ion-card-title>Respuestas de Proveedores</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="empty-responses" *ngIf="responsesCount === 0">
+          <ion-icon name="time-outline" color="medium"></ion-icon>
+          <h3>Aun no han respondido</h3>
+          <p>Deja esta pantalla abierta. Iremos actualizando las respuestas que entren para esta solicitud.</p>
+        </div>
+
+        <ion-list lines="full" *ngIf="responsesCount > 0">
+          <ion-item *ngFor="let response of currentSession?.responses">
+            <ion-label>
+              <h3>{{ response.providerName }}</h3>
+              <p class="response-time">{{ response.timestamp | date:'short' }}</p>
+              <p class="response-message">{{ response.message }}</p>
+              <p *ngIf="response.providerPhone"><strong>Telefono:</strong> {{ response.providerPhone }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- No Data State -->
+  <div class="no-data-state" *ngIf="!currentSession && !userLocation">
+    <ion-card>
+      <ion-card-content>
+        <div class="empty-state">
+          <ion-icon name="map-outline" size="large" color="medium"></ion-icon>
+          <h2>No hay datos para mostrar</h2>
+          <p>No se encontró ninguna búsqueda activa</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
+            Volver
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

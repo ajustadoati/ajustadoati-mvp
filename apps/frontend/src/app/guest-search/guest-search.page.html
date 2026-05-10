@@ -1,0 +1,130 @@
+<ion-header class="guest-header">
+  <ion-toolbar>
+    <ion-title>
+      <img src="assets/images/logo.png" alt="AjustadoATi" class="header-logo" />
+    </ion-title>
+    <ion-buttons slot="end" class="nav-actions">
+      <ion-button fill="clear" (click)="scrollToHowItWorks()">Como funciona</ion-button>
+      <ion-button fill="clear" (click)="goToRegister()">Registro</ion-button>
+      <ion-button fill="solid" class="login-button" (click)="goToLogin()">
+        <ion-icon name="log-in-outline" slot="start"></ion-icon>
+        Entrar
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="guest-content">
+  <section class="hero-section">
+    <div class="hero-copy">
+      <span class="eyebrow">Busqueda publica con GPS</span>
+      <h1>Encuentra servicios cercanos sin registrarte</h1>
+      <p>
+        Dinos que necesitas, elige una categoria y buscamos proveedores disponibles cerca de tu ubicacion.
+      </p>
+    </div>
+
+    <ion-card class="search-card">
+      <ion-card-content>
+        <div class="brand-block">
+          <img src="assets/images/logo.png" alt="AjustadoATi" />
+          <p>Los proveedores estan cerca. Empieza por tu necesidad.</p>
+        </div>
+
+        <ion-item fill="outline" class="form-item">
+          <ion-label position="floating">Categoria del servicio</ion-label>
+          <ion-select
+            [(ngModel)]="selectedCategory"
+            interface="popover"
+            placeholder="Selecciona una categoria"
+            [disabled]="isLoading || categories.length === 0"
+            (ionChange)="onCategoryChange($event)"
+          >
+            <ion-select-option *ngFor="let category of categories" [value]="category.id">
+              {{ category.name }}
+            </ion-select-option>
+          </ion-select>
+          <ion-spinner *ngIf="isLoading" name="crescent" slot="end"></ion-spinner>
+        </ion-item>
+
+        <ion-item fill="outline" class="form-item">
+          <ion-label position="floating">Que necesitas?</ion-label>
+          <ion-textarea
+            [(ngModel)]="serviceDescription"
+            placeholder="Ej: reparar una lavadora, plomero urgente, mudanza pequena"
+            rows="3"
+            maxlength="180"
+            [counter]="true"
+          ></ion-textarea>
+        </ion-item>
+
+        <div class="location-panel" [class.ready]="userLocation" (click)="refreshLocation(true)">
+          <div class="location-icon">
+            <ion-icon [name]="userLocation ? 'location' : 'location-outline'"></ion-icon>
+          </div>
+          <div>
+            <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion requerida' }}</strong>
+            <span>{{ locationText }}</span>
+          </div>
+          <ion-button fill="clear" size="small" type="button">
+            {{ userLocation ? 'Actualizar' : 'Activar' }}
+          </ion-button>
+        </div>
+
+        <ion-button
+          expand="block"
+          class="search-button"
+          (click)="onSearch()"
+          [disabled]="!canSearch || isLocationLoading"
+        >
+          <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
+          <ion-icon name="search-outline" slot="start" *ngIf="!isLocationLoading"></ion-icon>
+          Buscar proveedores
+        </ion-button>
+
+        <div class="guest-footnote">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Como invitado puedes ver proveedores cercanos. Para recibir respuestas en tiempo real, crea una cuenta.
+          </span>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </section>
+
+  <section id="how-it-works" class="how-section">
+    <div class="section-heading">
+      <span>Como funciona</span>
+      <h2>Simple para validar el MVP</h2>
+    </div>
+
+    <div class="steps-grid">
+      <article>
+        <ion-icon name="search-outline"></ion-icon>
+        <h3>1. Busca</h3>
+        <p>Selecciona una categoria y describe lo que necesitas.</p>
+      </article>
+      <article>
+        <ion-icon name="location-outline"></ion-icon>
+        <h3>2. Usamos GPS</h3>
+        <p>La ubicacion permite encontrar proveedores cerca de ti.</p>
+      </article>
+      <article>
+        <ion-icon name="map-outline"></ion-icon>
+        <h3>3. Mira proveedores</h3>
+        <p>Te mostramos resultados cercanos y te invitamos a registrarte para continuar.</p>
+      </article>
+    </div>
+
+    <div class="register-cta">
+      <div>
+        <h3>Quieres que los proveedores te respondan en tiempo real?</h3>
+        <p>Crea tu cuenta gratuita y activa el flujo completo de solicitudes.</p>
+      </div>
+      <ion-button color="success" (click)="goToRegister()">
+        <ion-icon name="person-add" slot="start"></ion-icon>
+        Crear cuenta
+      </ion-button>
+    </div>
+  </section>
+</ion-content>

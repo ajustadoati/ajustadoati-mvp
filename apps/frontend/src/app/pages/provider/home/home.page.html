@@ -1,0 +1,206 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>
+      Panel de Proveedor
+    </ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="refreshLocation()">
+        <ion-icon slot="icon-only" name="location-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="logout()">
+        <ion-icon slot="icon-only" name="power"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  <!-- Header con saludo -->
+  <div class="header-card">
+    <h1 class="greeting">{{ greetingText }}, {{ user?.fullName || 'Proveedor' }}!</h1>
+    <p class="subtitle" *ngIf="isAvailable">Listo para recibir solicitudes</p>
+    <p class="subtitle" *ngIf="!isAvailable">No disponible para solicitudes</p>
+
+    <!-- Availability Toggle -->
+    <div class="availability-toggle">
+      <div class="toggle-container" [class.available]="isAvailable" [class.unavailable]="!isAvailable">
+        <div class="toggle-label">
+          <ion-icon [name]="isAvailable ? 'radio-button-on' : 'radio-button-off'"></ion-icon>
+          <span>{{ isAvailable ? 'Disponible' : 'No disponible' }}</span>
+        </div>
+        <ion-toggle
+          [(ngModel)]="isAvailable"
+          (ionChange)="toggleAvailability($event.detail.checked)"
+          color="success"
+        ></ion-toggle>
+      </div>
+    </div>
+
+    <!-- Estado de conexion -->
+    <div class="connection-status">
+      <ion-chip [color]="connectionStatusColor">
+        <ion-icon [name]="isConnectedToWebSocket ? 'wifi' : 'wifi-outline'"></ion-icon>
+        <ion-label>{{ connectionStatusText }}</ion-label>
+      </ion-chip>
+
+      <ion-chip color="medium">
+        <ion-icon name="location"></ion-icon>
+        <ion-label>{{ locationText }}</ion-label>
+      </ion-chip>
+    </div>
+  </div>
+
+  <!-- Active Job Alert -->
+  <div class="active-job-alert" *ngIf="activeJob" (click)="navigateToActiveJob()">
+    <ion-card class="alert-card">
+      <ion-card-content>
+        <div class="alert-content">
+          <ion-icon name="briefcase-outline" color="warning"></ion-icon>
+          <div class="alert-text">
+            <h3>Trabajo Activo</h3>
+            <p>{{ activeJob.categoryName }} - {{ activeJob.clientName }}</p>
+          </div>
+          <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Estado operativo -->
+  <div class="stats-grid">
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <ion-icon name="mail-unread-outline" color="primary"></ion-icon>
+        <h2>{{ pendingCount }}</h2>
+        <p>Pendientes</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <ion-icon name="send-outline" color="success"></ion-icon>
+        <h2>{{ respondedTodayCount }}</h2>
+        <p>Respondidas hoy</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <ion-icon name="checkmark-done-outline" color="tertiary"></ion-icon>
+        <h2>{{ acceptedCount }}</h2>
+        <p>Aceptadas</p>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Solicitudes pendientes -->
+  <div class="section-header">
+    <h2>Solicitudes nuevas</h2>
+  </div>
+
+  <div class="requests-list" *ngIf="pendingRequests.length > 0; else noRequests">
+    <ion-card *ngFor="let request of pendingRequests"
+              class="request-card"
+              (click)="viewRequest(request)">
+      <ion-card-content>
+        <div class="request-header">
+          <div class="request-info">
+            <ion-badge color="primary">{{ request.categoryName }}</ion-badge>
+            <p class="request-time">{{ request.timestamp | date:'short' }}</p>
+          </div>
+          <ion-icon name="chevron-forward-outline"></ion-icon>
+        </div>
+
+        <h3 class="request-message">{{ request.message }}</h3>
+
+        <div class="request-footer">
+          <div class="request-user">
+            <ion-icon name="person-circle-outline"></ion-icon>
+            <span>{{ request.fromUser }}</span>
+          </div>
+          <div class="request-distance" *ngIf="request.maxDistanceKm">
+            <ion-icon name="navigate-outline"></ion-icon>
+            <span>{{ request.maxDistanceKm }} km</span>
+          </div>
+        </div>
+
+        <ion-button expand="block" size="small" class="respond-button">
+          <ion-icon slot="start" name="chatbox-ellipses-outline"></ion-icon>
+          Responder
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <ng-template #noRequests>
+    <ion-card class="empty-state">
+      <ion-card-content>
+        <ion-icon name="notifications-off-outline" color="medium" size="large"></ion-icon>
+        <p>No hay solicitudes nuevas</p>
+        <p class="hint" *ngIf="isAvailable">Las solicitudes apareceran aqui cuando los clientes las envien</p>
+        <p class="hint" *ngIf="!isAvailable">Activa tu disponibilidad para recibir solicitudes</p>
+      </ion-card-content>
+    </ion-card>
+  </ng-template>
+
+  <!-- Respuestas enviadas -->
+  <div class="section-header">
+    <h2>Respuestas enviadas</h2>
+  </div>
+
+  <div class="responses-list" *ngIf="sentResponses.length > 0; else noResponses">
+    <ion-card *ngFor="let response of sentResponses.slice(0, 5)" class="response-card">
+      <ion-card-content>
+        <div class="request-header">
+          <div class="request-info">
+            <ion-badge [color]="response.status === 'accepted' ? 'success' : 'medium'">
+              {{ response.status === 'accepted' ? 'Aceptada' : 'Enviada' }}
+            </ion-badge>
+            <p class="request-time">{{ response.sentAt | date:'short' }}</p>
+          </div>
+        </div>
+
+        <h3 class="request-message">{{ response.request.message }}</h3>
+        <div class="request-footer">
+          <div class="request-user">
+            <ion-icon name="person-circle-outline"></ion-icon>
+            <span>{{ response.request.fromUser }}</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <ng-template #noResponses>
+    <ion-card class="empty-state compact">
+      <ion-card-content>
+        <ion-icon name="send-outline" color="medium"></ion-icon>
+        <p>Aun no has respondido solicitudes</p>
+      </ion-card-content>
+    </ion-card>
+  </ng-template>
+
+  <!-- Acciones simples -->
+  <div class="section-header">
+    <h2>Mas opciones</h2>
+  </div>
+
+  <div class="actions-grid">
+    <ion-card class="action-card" (click)="navigateToJobsHistory()">
+      <ion-card-content>
+        <ion-icon name="time-outline" color="secondary" size="large"></ion-icon>
+        <h3>Historial</h3>
+        <p>Trabajos completados</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="action-card" (click)="navigateToProfile()">
+      <ion-card-content>
+        <ion-icon name="person-outline" color="tertiary" size="large"></ion-icon>
+        <h3>Mi Perfil</h3>
+        <p>Edita tu informacion</p>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+</ion-content>

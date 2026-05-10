@@ -1,0 +1,208 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()">
+        <ion-icon slot="icon-only" name="arrow-back"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Mi Perfil</ion-title>
+    <ion-buttons slot="end">
+      <ion-button *ngIf="!isEditMode" (click)="toggleEditMode()">
+        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="logout()">
+        <ion-icon slot="icon-only" name="power"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  <div class="profile-container">
+    <!-- Profile Header -->
+    <div class="profile-header">
+      <div class="avatar">
+        <ion-icon name="person-circle" color="primary"></ion-icon>
+      </div>
+      <h1>{{ user?.fullName || 'Proveedor' }}</h1>
+      <ion-badge color="success">Proveedor Verificado</ion-badge>
+    </div>
+
+    <!-- Profile Form -->
+    <form [formGroup]="profileForm">
+      <ion-card class="form-card">
+        <ion-card-header>
+          <ion-card-title>Información Personal</ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+          <!-- Name -->
+          <ion-item lines="full" [class.ion-invalid]="name?.invalid && name?.touched">
+            <ion-label position="stacked">
+              Nombre Completo *
+              <ion-text color="danger" *ngIf="name?.invalid && name?.touched">
+                <p class="error-text">Campo requerido</p>
+              </ion-text>
+            </ion-label>
+            <ion-input
+              formControlName="name"
+              type="text"
+              placeholder="Tu nombre completo">
+            </ion-input>
+          </ion-item>
+
+          <!-- Email (disabled) -->
+          <ion-item lines="full">
+            <ion-label position="stacked">Email</ion-label>
+            <ion-input
+              formControlName="email"
+              type="email"
+              [disabled]="true">
+            </ion-input>
+          </ion-item>
+
+          <!-- Phone -->
+          <ion-item lines="none" [class.ion-invalid]="phone?.invalid && phone?.touched">
+            <ion-label position="stacked">
+              Teléfono *
+              <ion-text color="danger" *ngIf="phone?.invalid && phone?.touched">
+                <p class="error-text">Campo requerido</p>
+              </ion-text>
+            </ion-label>
+            <ion-input
+              formControlName="phone"
+              type="tel"
+              placeholder="+1 234 567 8900">
+            </ion-input>
+          </ion-item>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Location Card -->
+      <ion-card class="form-card">
+        <ion-card-header>
+          <ion-card-title>Ubicación</ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+          <ion-item lines="none">
+            <ion-label position="stacked">Dirección</ion-label>
+            <ion-input
+              formControlName="address"
+              type="text"
+              placeholder="Tu dirección">
+            </ion-input>
+          </ion-item>
+
+          <div class="location-info" *ngIf="currentPosition">
+            <div class="info-row">
+              <ion-icon name="navigate-outline" color="success"></ion-icon>
+              <div class="info-content">
+                <span class="info-label">Coordenadas Actuales</span>
+                <span class="info-value">
+                  {{ currentPosition.latitude.toFixed(4) }}, {{ currentPosition.longitude.toFixed(4) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <ion-button
+            expand="block"
+            fill="outline"
+            (click)="updateLocation()"
+            class="location-button">
+            <ion-icon slot="start" name="location-outline"></ion-icon>
+            Actualizar Ubicación GPS
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Service Categories -->
+      <ion-card class="form-card">
+        <ion-card-header>
+          <ion-card-title>Categorías de Servicio</ion-card-title>
+          <ion-card-subtitle>
+            {{ isEditMode ? 'Toca para agregar o quitar categorías' : 'Los clientes te encontrarán en estas categorías' }}
+          </ion-card-subtitle>
+        </ion-card-header>
+
+        <ion-card-content>
+          <!-- Loading -->
+          <div *ngIf="loadingCategories" class="loading-categories">
+            <ion-spinner name="crescent"></ion-spinner>
+          </div>
+
+          <!-- View Mode: Show selected categories -->
+          <div *ngIf="!loadingCategories && !isEditMode">
+            <div class="categories-list" *ngIf="selectedCategories.length > 0">
+              <ion-chip *ngFor="let categoryId of selectedCategories" color="primary">
+                <ion-label>{{ getCategoryName(categoryId) }}</ion-label>
+              </ion-chip>
+            </div>
+            <div class="categories-empty" *ngIf="selectedCategories.length === 0">
+              <p>No tienes categorías asignadas</p>
+            </div>
+          </div>
+
+          <!-- Edit Mode: Show all categories to select -->
+          <div *ngIf="!loadingCategories && isEditMode" class="categories-grid">
+            <div
+              *ngFor="let category of availableCategories"
+              class="category-card"
+              [class.selected]="isCategorySelected(category.id)"
+              (click)="toggleCategory(category.id)"
+            >
+              <ion-icon
+                [name]="isCategorySelected(category.id) ? 'checkmark-circle' : 'add-circle-outline'"
+                [color]="isCategorySelected(category.id) ? 'success' : 'medium'"
+              ></ion-icon>
+              <span>{{ category.name }}</span>
+            </div>
+          </div>
+
+          <p class="categories-hint" *ngIf="isEditMode && selectedCategories.length === 0">
+            <ion-icon name="warning-outline" color="warning"></ion-icon>
+            Selecciona al menos una categoría
+          </p>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons" *ngIf="isEditMode">
+        <ion-button expand="block" (click)="toggleEditMode()" fill="outline">
+          Cancelar
+        </ion-button>
+        <ion-button
+          expand="block"
+          [disabled]="profileForm.invalid || isSaving"
+          (click)="saveProfile()">
+          <ion-icon slot="start" name="save-outline"></ion-icon>
+          {{ isSaving ? 'Guardando...' : 'Guardar Cambios' }}
+        </ion-button>
+      </div>
+    </form>
+
+    <!-- Account Stats -->
+    <ion-card class="stats-card">
+      <ion-card-header>
+        <ion-card-title>Estadísticas</ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <ion-icon name="calendar-outline" color="primary"></ion-icon>
+            <span class="stat-label">Miembro desde</span>
+            <span class="stat-value">{{ user?.createdAt | date:'MMM yyyy' }}</span>
+          </div>
+
+          <div class="stat-item">
+            <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+            <span class="stat-label">Estado</span>
+            <span class="stat-value">Activo</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

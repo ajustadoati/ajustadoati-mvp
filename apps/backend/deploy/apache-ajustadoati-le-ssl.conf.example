@@ -1,0 +1,38 @@
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerAdmin webmaster@localhost
+    ServerName ajustadoati.com
+    ServerAlias www.ajustadoati.com
+    DocumentRoot /var/www/ajustadoati.com
+
+    ErrorLog ${APACHE_LOG_DIR}/ajustadoati_error.log
+    CustomLog ${APACHE_LOG_DIR}/ajustadoati_access.log combined
+
+    Include /etc/letsencrypt/options-ssl-apache.conf
+    SSLCertificateFile /etc/letsencrypt/live/ajustadoati.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/ajustadoati.com/privkey.pem
+
+    ProxyPreserveHost On
+    ProxyRequests Off
+
+    # Mantener solo si realmente sigues usando Openfire
+    # ProxyPass /openfire ws://127.0.0.1:8080/openfire
+    # ProxyPassReverse /openfire ws://127.0.0.1:8080/openfire
+
+    # Backend Spring Boot
+    ProxyPass /api/ws-native ws://127.0.0.1:8086/api/ws-native
+    ProxyPassReverse /api/ws-native ws://127.0.0.1:8086/api/ws-native
+
+    ProxyPass /api/ws ws://127.0.0.1:8086/api/ws
+    ProxyPassReverse /api/ws ws://127.0.0.1:8086/api/ws
+
+    ProxyPass /api http://127.0.0.1:8086/api
+    ProxyPassReverse /api http://127.0.0.1:8086/api
+
+    <Directory /var/www/ajustadoati.com>
+        Options -Indexes +FollowSymLinks +MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+</IfModule>

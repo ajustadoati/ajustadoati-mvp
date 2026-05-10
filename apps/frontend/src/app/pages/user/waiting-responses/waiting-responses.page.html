@@ -1,0 +1,214 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" fill="clear">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Esperando Respuestas</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="waiting-responses-content">
+  <!-- Search Session Info -->
+  <div class="search-info" *ngIf="currentSession">
+    <ion-card class="search-summary-card">
+      <ion-card-content>
+        <div class="search-summary">
+          <div class="search-details">
+            <h3>{{ currentSession.searchRequest.productName }}</h3>
+            <div class="status-row">
+              <span class="search-status">
+                Estado:
+                <span [class]="isSearchActive ? 'status-active' : 'status-completed'">
+                  {{ isSearchActive ? 'Buscando' : 'Completada' }}
+                </span>
+              </span>
+              <span class="countdown" *ngIf="isSearchActive">
+                <ion-icon name="time-outline"></ion-icon>
+                {{ searchCountdownDisplay }}
+              </span>
+            </div>
+            <p class="websocket-status">
+              WebSocket:
+              <span [class]="isWebSocketConnected ? 'status-connected' : 'status-disconnected'">
+                {{ isWebSocketConnected ? 'Conectado' : 'Desconectado' }}
+              </span>
+            </p>
+          </div>
+          <div class="search-stats">
+            <div class="stat">
+              <span class="stat-number">{{ currentSession.providers.length }}</span>
+              <span class="stat-label">Notificados</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">{{ searchStats.total }}</span>
+              <span class="stat-label">Respuestas</span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- No Search Session -->
+  <div class="no-search" *ngIf="!currentSession">
+    <ion-card class="empty-state-card">
+      <ion-card-content>
+        <div class="empty-state">
+          <ion-icon name="search-outline" size="large" color="medium"></ion-icon>
+          <h2>No hay busquedas activas</h2>
+          <p>Regresa al inicio para comenzar una nueva busqueda</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="home-outline" slot="start"></ion-icon>
+            Ir al Inicio
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Provider Responses -->
+  <div class="responses-section" *ngIf="currentSession && currentSession.responses.length > 0">
+    <div class="section-header">
+      <h2>Ofertas de Proveedores</h2>
+      <p>{{ searchStats.total }} respuestas recibidas</p>
+    </div>
+
+    <div class="responses-list">
+      <ion-card
+        class="response-card"
+        *ngFor="let response of currentSession.responses"
+        [class.accepted]="response.accepted"
+        [class.rejected]="!response.accepted"
+      >
+        <ion-card-content>
+          <div class="response-header">
+            <div class="provider-info">
+              <div class="provider-avatar">
+                <ion-icon name="person-circle-outline"></ion-icon>
+              </div>
+              <div class="provider-details">
+                <h3>{{ response.providerName }}</h3>
+                <p>{{ response.providerEmail }}</p>
+              </div>
+            </div>
+            <div class="response-status">
+              <ion-badge
+                [color]="response.accepted ? 'success' : 'danger'"
+                class="status-badge"
+              >
+                {{ response.accepted ? 'Disponible' : 'No disponible' }}
+              </ion-badge>
+            </div>
+          </div>
+
+          <div class="response-content" *ngIf="response.message">
+            <p class="response-message">{{ response.message }}</p>
+          </div>
+
+          <div class="response-details" *ngIf="response.accepted">
+            <div class="detail-item" *ngIf="response.estimatedTime">
+              <ion-icon name="time-outline" color="primary"></ion-icon>
+              <span>{{ response.estimatedTime }} min</span>
+            </div>
+            <div class="detail-item" *ngIf="response.price">
+              <ion-icon name="cash-outline" color="success"></ion-icon>
+              <span>${{ response.price | number }}</span>
+            </div>
+          </div>
+
+          <div class="response-actions" *ngIf="response.accepted">
+            <ion-button
+              fill="solid"
+              color="primary"
+              expand="block"
+              (click)="acceptOffer(response)"
+            >
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Aceptar Oferta
+            </ion-button>
+            <ion-button
+              fill="outline"
+              size="small"
+              (click)="contactProvider(response)"
+            >
+              <ion-icon name="chatbubble-outline" slot="start"></ion-icon>
+              Contactar
+            </ion-button>
+          </div>
+
+          <div class="response-timestamp">
+            <small>{{ response.timestamp | date:'short' }}</small>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </div>
+
+  <!-- No Responses Yet -->
+  <div class="no-responses" *ngIf="currentSession && currentSession.responses.length === 0 && isSearchActive">
+    <ion-card class="waiting-card">
+      <ion-card-content>
+        <div class="waiting-state">
+          <div class="pulse-animation">
+            <ion-spinner name="crescent" color="primary"></ion-spinner>
+          </div>
+          <h3>Esperando respuestas...</h3>
+          <p>Se notifico a {{ currentSession.providers.length }} proveedores cercanos</p>
+          <p class="waiting-note">Las respuestas apareceran aqui en tiempo real</p>
+          <div class="connection-indicator">
+            <ion-chip [color]="isWebSocketConnected ? 'success' : 'warning'" size="small">
+              <ion-icon [name]="isWebSocketConnected ? 'wifi' : 'wifi-outline'"></ion-icon>
+              <ion-label>{{ isWebSocketConnected ? 'Conectado' : 'Conectando...' }}</ion-label>
+            </ion-chip>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- No Responses After Timeout -->
+  <div class="no-responses" *ngIf="currentSession && currentSession.responses.length === 0 && !isSearchActive">
+    <ion-card class="timeout-card">
+      <ion-card-content>
+        <div class="timeout-state">
+          <ion-icon name="hourglass-outline" size="large" color="warning"></ion-icon>
+          <h3>Busqueda finalizada</h3>
+          <p>No se recibieron respuestas de proveedores</p>
+          <ion-button fill="outline" (click)="goBack()">
+            <ion-icon name="refresh-outline" slot="start"></ion-icon>
+            Intentar de nuevo
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Actions Section -->
+  <div class="actions-section" *ngIf="currentSession">
+    <div class="actions-grid">
+      <ion-button
+        expand="block"
+        fill="outline"
+        class="action-button"
+        (click)="viewOnMap()"
+      >
+        <ion-icon name="map-outline" slot="start"></ion-icon>
+        Ver en Mapa
+      </ion-button>
+
+      <ion-button
+        expand="block"
+        fill="solid"
+        color="danger"
+        class="action-button"
+        (click)="finishSearch()"
+        *ngIf="isSearchActive"
+      >
+        <ion-icon name="stop-outline" slot="start"></ion-icon>
+        Cancelar Busqueda
+      </ion-button>
+    </div>
+  </div>
+</ion-content>
