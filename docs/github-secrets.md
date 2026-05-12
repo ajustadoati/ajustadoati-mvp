@@ -45,6 +45,10 @@ Repositorio:
 - `VPS_WEB_ROOT=/var/www/ajustadoati.com`
 - `GOOGLE_MAPS_API_KEY=` clave restringida por dominio a `ajustadoati.com` y `www.ajustadoati.com`
 
+El workflow del frontend crea backups automaticos en:
+
+- `/var/www/ajustadoati.com_backups`
+
 ## Preparacion previa en el VPS
 
 ### 1. Crear carpeta backend
@@ -79,6 +83,9 @@ SHOW_SQL=false
 ```bash
 sudo chown -R ajustado:www-data /var/www/ajustadoati.com
 sudo chmod -R 775 /var/www/ajustadoati.com
+sudo mkdir -p /var/www/ajustadoati.com_backups
+sudo chown -R ajustado:www-data /var/www/ajustadoati.com_backups
+sudo chmod -R 775 /var/www/ajustadoati.com_backups
 ```
 
 ## Como cargarlos en GitHub

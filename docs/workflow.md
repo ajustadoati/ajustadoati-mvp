@@ -32,6 +32,7 @@ npm start
 
 ## Despliegue VPS
 
-- backend por Docker en puerto local del VPS
+- backend por Docker en `127.0.0.1:8087`
 - frontend como archivos estaticos en `/var/www/ajustadoati.com`
+- backup automatico del frontend en `/var/www/ajustadoati.com_backups`
 - Apache hace proxy a `/api` y WebSocket

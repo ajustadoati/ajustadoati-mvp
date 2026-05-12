@@ -9,7 +9,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       PORT: 8080
     ports:
-      - "127.0.0.1:8086:8080"
+      - "127.0.0.1:8087:8080"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
       interval: 30s

@@ -83,5 +83,34 @@ jobs:
       - name: Add VPS to known_hosts
         run: ssh-keyscan -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Sync static files to VPS
-        run: rsync -az --delete -e "ssh -p ${{ secrets.VPS_PORT }}" ./www/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_WEB_ROOT }}/"
+      - name: Upload build to temporary VPS directory
+        run: rsync -az --delete -e "ssh -p ${{ secrets.VPS_PORT }}" ./www/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/ajustadoati-frontend-next/"
+
+      - name: Backup current frontend and publish new build
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            WEB_ROOT="${{ secrets.VPS_WEB_ROOT }}"
+            BACKUP_ROOT="${WEB_ROOT%/}_backups"
+            RELEASE_SOURCE="/tmp/ajustadoati-frontend-next"
+            TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+            BACKUP_DIR="${BACKUP_ROOT}/${TIMESTAMP}"
+
+            mkdir -p "$BACKUP_ROOT"
+
+            if [ -d "$WEB_ROOT" ] && [ "$(ls -A "$WEB_ROOT" 2>/dev/null)" ]; then
+              mkdir -p "$BACKUP_DIR"
+              rsync -a "$WEB_ROOT/" "$BACKUP_DIR/"
+              echo "Backup created at $BACKUP_DIR"
+            else
+              echo "No current frontend content found to back up."
+            fi
+
+            mkdir -p "$WEB_ROOT"
+            rsync -az --delete "$RELEASE_SOURCE/" "$WEB_ROOT/"
+            rm -rf "$RELEASE_SOURCE"

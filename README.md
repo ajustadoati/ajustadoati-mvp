@@ -33,5 +33,6 @@ npm start
 ## Despliegue
 
 - backend en Docker
-- frontend estatico via Apache
+- backend publicado localmente en `127.0.0.1:8087`
+- frontend estatico via Apache con backup previo del contenido actual
 - CI/CD por GitHub Actions en este monorepo

@@ -20,14 +20,14 @@
     # ProxyPassReverse /openfire ws://127.0.0.1:8080/openfire
 
     # Backend Spring Boot
-    ProxyPass /api/ws-native ws://127.0.0.1:8086/api/ws-native
-    ProxyPassReverse /api/ws-native ws://127.0.0.1:8086/api/ws-native
+    ProxyPass /api/ws-native ws://127.0.0.1:8087/api/ws-native
+    ProxyPassReverse /api/ws-native ws://127.0.0.1:8087/api/ws-native
 
-    ProxyPass /api/ws ws://127.0.0.1:8086/api/ws
-    ProxyPassReverse /api/ws ws://127.0.0.1:8086/api/ws
+    ProxyPass /api/ws ws://127.0.0.1:8087/api/ws
+    ProxyPassReverse /api/ws ws://127.0.0.1:8087/api/ws
 
-    ProxyPass /api http://127.0.0.1:8086/api
-    ProxyPassReverse /api http://127.0.0.1:8086/api
+    ProxyPass /api http://127.0.0.1:8087/api
+    ProxyPassReverse /api http://127.0.0.1:8087/api
 
     <Directory /var/www/ajustadoati.com>
         Options -Indexes +FollowSymLinks +MultiViews
