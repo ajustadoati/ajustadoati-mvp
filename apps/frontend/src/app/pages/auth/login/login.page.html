@@ -1,6 +1,5 @@
 <ion-content class="login-content" [fullscreen]="true">
   <div class="login-container">
-    <!-- Header Section -->
     <div class="header-section">
       <div class="logo-container">
         <img src="assets/images/logo.png" alt="AjustadoATi" class="brand-logo" />
@@ -8,92 +7,42 @@
       <p class="app-subtitle">Encuentra el servicio que necesitas</p>
     </div>
 
-    <!-- Login Form -->
     <div class="form-section">
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-        <!-- Email Input -->
-        <ion-item fill="outline" class="form-item">
-          <ion-icon name="mail-outline" slot="start"></ion-icon>
-          <ion-input
-            type="email"
-            formControlName="email"
-            autocomplete="email"
-            inputmode="email"
-            placeholder="tu@email.com"
-            label="Email"
-            labelPlacement="floating"
-          ></ion-input>
-        </ion-item>
-        <div class="error-message" *ngIf="email?.errors?.['required'] && email?.touched">
-          El email es requerido
+        <div class="field-group">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" formControlName="email" autocomplete="email" inputmode="email" placeholder="tu@email.com" />
         </div>
-        <div class="error-message" *ngIf="email?.errors?.['email'] && email?.touched">
-          Ingresa un email válido
-        </div>
+        <div class="error-message" *ngIf="email?.errors?.['required'] && email?.touched">El email es requerido</div>
+        <div class="error-message" *ngIf="email?.errors?.['email'] && email?.touched">Ingresa un email válido</div>
 
-        <!-- Password Input -->
-        <ion-item fill="outline" class="form-item">
-          <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
-          <ion-input
-            type="password"
-            formControlName="password"
-            autocomplete="current-password"
-            placeholder="Tu contraseña"
-            label="Contraseña"
-            labelPlacement="floating"
-          ></ion-input>
-        </ion-item>
-        <div class="error-message" *ngIf="password?.errors?.['required'] && password?.touched">
-          La contraseña es requerida
+        <div class="field-group">
+          <label for="login-password">Contraseña</label>
+          <input id="login-password" type="password" formControlName="password" autocomplete="current-password" placeholder="Tu contraseña" />
         </div>
-        <div class="error-message" *ngIf="password?.errors?.['minlength'] && password?.touched">
-          Mínimo 6 caracteres
-        </div>
+        <div class="error-message" *ngIf="password?.errors?.['required'] && password?.touched">La contraseña es requerida</div>
+        <div class="error-message" *ngIf="password?.errors?.['minlength'] && password?.touched">Mínimo 6 caracteres</div>
 
-        <!-- Login Button -->
-        <ion-button
-          expand="block"
-          type="submit"
-          class="login-button"
-          [disabled]="isLoading"
-        >
+        <button type="submit" class="primary-action" [disabled]="isLoading">
           <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
           <span *ngIf="!isLoading">Iniciar Sesión</span>
-        </ion-button>
+        </button>
 
-        <!-- Forgot Password -->
         <div class="forgot-password-link">
           <a (click)="forgotPassword()">¿Olvidaste tu contraseña?</a>
         </div>
       </form>
 
-      <!-- Guest Access -->
       <div class="guest-section">
         <p class="guest-text">¿Solo quieres probar?</p>
-        <ion-button
-          expand="block"
-          fill="outline"
-          color="medium"
-          (click)="tryAsGuest()"
-          [disabled]="isLoading"
-        >
-          <ion-icon name="search-outline" slot="start"></ion-icon>
+        <button type="button" class="secondary-neutral" (click)="tryAsGuest()" [disabled]="isLoading">
           Buscar sin registrarse
-        </ion-button>
+        </button>
       </div>
 
-      <!-- Register Section -->
       <div class="register-section">
         <p class="register-text">¿No tienes cuenta?</p>
-        <ion-button
-          expand="block"
-          fill="outline"
-          class="register-button"
-          (click)="goToRegister()"
-          [disabled]="isLoading"
-        >
-          Crear cuenta
-        </ion-button>
+        <button type="button" class="secondary-action" (click)="goToRegister()" [disabled]="isLoading">Crear cuenta</button>
       </div>
     </div>
   </div>
