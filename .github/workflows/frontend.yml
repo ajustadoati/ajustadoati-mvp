@@ -72,7 +72,7 @@ jobs:
             exit 1
           fi
           sed -i "s|YOUR_PRODUCTION_GOOGLE_MAPS_API_KEY|$GOOGLE_MAPS_API_KEY|g" src/environments/environment.prod.ts
-          sed -i "s|key=[^"]*|key=$GOOGLE_MAPS_API_KEY|g" src/index.html
+          sed -i 's|key=[^"]*|key='"$GOOGLE_MAPS_API_KEY"'|g' src/index.html
           npm run build -- --configuration production
 
       - name: Setup SSH agent
