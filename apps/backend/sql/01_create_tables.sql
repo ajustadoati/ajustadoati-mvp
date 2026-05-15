@@ -192,7 +192,8 @@ INSERT INTO categories (name, description, display_order) VALUES
 ('Reparación de Electrodomésticos', 'Reparación y mantenimiento de electrodomésticos', 7),
 ('Construcción', 'Servicios de construcción, remodelación y obra civil', 8),
 ('Tecnología', 'Soporte técnico, reparación de computadoras y dispositivos', 9),
-('Transporte', 'Servicios de mudanza, transporte de mercancías y logística', 10)
+('Transporte', 'Servicios de mudanza, transporte de mercancías y logística', 10),
+('Delivery', 'Entrega de pedidos, mensajería, encargos y reparto de productos', 11)
 ON CONFLICT (name) DO NOTHING;
 
 COMMENT ON TABLE profiles IS 'Extended user profiles with location and provider information';

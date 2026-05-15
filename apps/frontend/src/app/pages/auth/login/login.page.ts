@@ -118,7 +118,7 @@ export class LoginPage implements OnInit {
   private async sendPasswordReset(email: string) {
     try {
       // Backend no expone reset password por ahora.
-      await this.showErrorToast('Recuperación de contraseña no está disponible en este MVP.');
+      await this.showErrorToast('Recuperación de contraseña no está disponible por ahora.');
     } catch (error: any) {
       console.error('🚨 Password reset error:', error);
       await this.showErrorToast('Error al enviar email de recuperación');

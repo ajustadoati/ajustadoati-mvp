@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 
-export interface MVPMetrics {
+export interface PlatformMetrics {
   userRegistrations: number;
   providerRegistrations: number;
   searchesPerformed: number;
@@ -19,7 +19,7 @@ export class AnalyticsService {
 
   constructor(private http: HttpClient) {}
 
-  // Eventos críticos para MVP
+  // Eventos críticos de la plataforma
   trackUserRegistration(source: 'mobile' | 'web') {
     this.trackEvent('user_registration', { source });
   }
@@ -61,12 +61,12 @@ export class AnalyticsService {
     }
   }
 
-  // Obtener métricas del dashboard
-  async getMVPMetrics(): Promise<MVPMetrics> {
+  // Obtener métricas generales del dashboard
+  async getPlatformMetrics(): Promise<PlatformMetrics> {
     try {
-      return await this.http.get<MVPMetrics>(`${this.apiUrl}/mvp-metrics`).toPromise() as MVPMetrics;
+      return await this.http.get<PlatformMetrics>(`${this.apiUrl}/summary-metrics`).toPromise() as PlatformMetrics;
     } catch (error) {
-      console.error('Error getting MVP metrics:', error);
+      console.error('Error getting platform metrics:', error);
       return {
         userRegistrations: 0,
         providerRegistrations: 0,
