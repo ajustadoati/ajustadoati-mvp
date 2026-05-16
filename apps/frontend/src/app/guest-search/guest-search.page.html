@@ -1,16 +1,20 @@
-<ion-content class="guest-content">
-  <header class="site-header">
-    <a class="brand-link" href="/" aria-label="AjustadoATi inicio">
+<ion-header class="guest-header">
+  <ion-toolbar>
+    <ion-title>
       <img src="assets/images/logo.png" alt="AjustadoATi" class="header-logo" />
-    </a>
+    </ion-title>
+    <ion-buttons slot="end" class="nav-actions">
+      <ion-button fill="clear" (click)="scrollToHowItWorks()">Como funciona</ion-button>
+      <ion-button fill="clear" (click)="goToRegister()">Registro</ion-button>
+      <ion-button fill="solid" class="login-button" (click)="goToLogin()">
+        <ion-icon name="log-in-outline" slot="start"></ion-icon>
+        Entrar
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
 
-    <nav class="nav-actions" aria-label="Navegacion principal">
-      <button type="button" class="nav-link" (click)="scrollToHowItWorks()">Como funciona</button>
-      <button type="button" class="nav-link" (click)="goToRegister()">Registro</button>
-      <button type="button" class="nav-cta" (click)="goToLogin()">Entrar</button>
-    </nav>
-  </header>
-
+<ion-content class="guest-content">
   <section class="hero-section">
     <div class="hero-copy">
       <span class="eyebrow">Busqueda publica con GPS</span>
@@ -20,74 +24,74 @@
       </p>
     </div>
 
-    <div class="search-card">
-      <div class="brand-block">
-        <img src="assets/images/logo.png" alt="AjustadoATi" />
-        <p>Los proveedores estan cerca. Empieza por tu necesidad.</p>
-      </div>
+    <ion-card class="search-card">
+      <ion-card-content>
+        <div class="brand-block">
+          <img src="assets/images/logo.png" alt="AjustadoATi" />
+          <p>Los proveedores estan cerca. Empieza por tu necesidad.</p>
+        </div>
 
-      <div class="field-group">
-        <label for="guest-category">Categoria del servicio</label>
-        <div class="field-shell">
-          <select
-            id="guest-category"
+        <ion-item fill="outline" class="form-item">
+          <ion-select
             [(ngModel)]="selectedCategory"
+            interface="popover"
+            label="Categoria del servicio"
+            labelPlacement="stacked"
+            placeholder="Selecciona una categoria"
             [disabled]="isLoading || categories.length === 0"
+            (ionChange)="onCategoryChange($event)"
           >
-            <option [ngValue]="null">Selecciona una categoria</option>
-            <option *ngFor="let category of categories" [ngValue]="category.id">
+            <ion-select-option *ngFor="let category of categories" [value]="category.id">
               {{ category.name }}
-            </option>
-          </select>
-          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
-        </div>
-      </div>
+            </ion-select-option>
+          </ion-select>
+          <ion-spinner *ngIf="isLoading" name="crescent" slot="end"></ion-spinner>
+        </ion-item>
 
-      <div class="field-group">
-        <label for="guest-description">Que necesitas?</label>
-        <div class="field-shell textarea-shell">
-          <textarea
-            id="guest-description"
+        <ion-item fill="outline" class="form-item">
+          <ion-textarea
             [(ngModel)]="serviceDescription"
+            label="Que necesitas?"
+            labelPlacement="stacked"
             placeholder="Ej: reparar una lavadora, plomero urgente, mudanza pequena"
-            rows="4"
+            rows="3"
             maxlength="180"
-          ></textarea>
-          <span class="char-count">{{ serviceDescription.length }} / 180</span>
-        </div>
-      </div>
+            [counter]="true"
+          ></ion-textarea>
+        </ion-item>
 
-      <div class="location-panel" [class.ready]="userLocation" (click)="refreshLocation(true)">
-        <div class="location-icon">
-          <ion-icon [name]="userLocation ? 'location' : 'location-outline'"></ion-icon>
+        <div class="location-panel" [class.ready]="userLocation" (click)="refreshLocation(true)">
+          <div class="location-icon">
+            <ion-icon [name]="userLocation ? 'location' : 'location-outline'"></ion-icon>
+          </div>
+          <div>
+            <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion requerida' }}</strong>
+            <span>{{ locationText }}</span>
+          </div>
+          <ion-button fill="clear" size="small" type="button">
+            {{ userLocation ? 'Actualizar' : 'Activar' }}
+          </ion-button>
         </div>
-        <div>
-          <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion requerida' }}</strong>
-          <span>{{ locationText }}</span>
+
+        <ion-button
+          expand="block"
+          class="search-button"
+          (click)="onSearch()"
+          [disabled]="!canSearch || isLocationLoading"
+        >
+          <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
+          <ion-icon name="search-outline" slot="start" *ngIf="!isLocationLoading"></ion-icon>
+          Buscar proveedores
+        </ion-button>
+
+        <div class="guest-footnote">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Como invitado puedes ver proveedores cercanos. Para recibir respuestas en tiempo real, crea una cuenta.
+          </span>
         </div>
-        <button type="button" class="location-action">
-          {{ userLocation ? 'Actualizar' : 'Activar' }}
-        </button>
-      </div>
-
-      <button
-        type="button"
-        class="search-button"
-        (click)="onSearch()"
-        [disabled]="!canSearch || isLocationLoading"
-      >
-        <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
-        <ion-icon name="search-outline" *ngIf="!isLocationLoading"></ion-icon>
-        <span>Buscar proveedores</span>
-      </button>
-
-      <div class="guest-footnote">
-        <ion-icon name="information-circle-outline"></ion-icon>
-        <span>
-          Como invitado puedes ver proveedores cercanos. Para recibir respuestas en tiempo real, crea una cuenta.
-        </span>
-      </div>
-    </div>
+      </ion-card-content>
+    </ion-card>
   </section>
 
   <section id="how-it-works" class="how-section">
@@ -119,7 +123,10 @@
         <h3>Quieres que los proveedores te respondan en tiempo real?</h3>
         <p>Crea tu cuenta gratuita y activa el flujo completo de solicitudes.</p>
       </div>
-      <button type="button" class="cta-button" (click)="goToRegister()">Crear cuenta</button>
+      <ion-button color="success" (click)="goToRegister()">
+        <ion-icon name="person-add" slot="start"></ion-icon>
+        Crear cuenta
+      </ion-button>
     </div>
   </section>
 </ion-content>
