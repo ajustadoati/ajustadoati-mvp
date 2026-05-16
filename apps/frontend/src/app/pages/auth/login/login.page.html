@@ -9,39 +9,24 @@
 
     <div class="form-section">
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-        <ion-item fill="outline" class="form-item">
-          <ion-icon name="mail-outline" slot="start"></ion-icon>
-          <ion-input
-            type="email"
-            formControlName="email"
-            autocomplete="email"
-            inputmode="email"
-            placeholder="tu@email.com"
-            label="Email"
-            labelPlacement="stacked"
-          ></ion-input>
-        </ion-item>
+        <div class="field-group">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" formControlName="email" autocomplete="email" inputmode="email" placeholder="tu@email.com" />
+        </div>
         <div class="error-message" *ngIf="email?.errors?.['required'] && email?.touched">El email es requerido</div>
         <div class="error-message" *ngIf="email?.errors?.['email'] && email?.touched">Ingresa un email válido</div>
 
-        <ion-item fill="outline" class="form-item">
-          <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
-          <ion-input
-            type="password"
-            formControlName="password"
-            autocomplete="current-password"
-            placeholder="Tu contraseña"
-            label="Contraseña"
-            labelPlacement="stacked"
-          ></ion-input>
-        </ion-item>
+        <div class="field-group">
+          <label for="login-password">Contraseña</label>
+          <input id="login-password" type="password" formControlName="password" autocomplete="current-password" placeholder="Tu contraseña" />
+        </div>
         <div class="error-message" *ngIf="password?.errors?.['required'] && password?.touched">La contraseña es requerida</div>
         <div class="error-message" *ngIf="password?.errors?.['minlength'] && password?.touched">Mínimo 6 caracteres</div>
 
-        <ion-button expand="block" type="submit" class="login-button" [disabled]="isLoading">
+        <button type="submit" class="primary-action" [disabled]="isLoading">
           <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
           <span *ngIf="!isLoading">Iniciar Sesión</span>
-        </ion-button>
+        </button>
 
         <div class="forgot-password-link">
           <a (click)="forgotPassword()">¿Olvidaste tu contraseña?</a>
@@ -50,17 +35,14 @@
 
       <div class="guest-section">
         <p class="guest-text">¿Solo quieres probar?</p>
-        <ion-button expand="block" fill="outline" color="medium" (click)="tryAsGuest()" [disabled]="isLoading">
-          <ion-icon name="search-outline" slot="start"></ion-icon>
+        <button type="button" class="secondary-neutral" (click)="tryAsGuest()" [disabled]="isLoading">
           Buscar sin registrarse
-        </ion-button>
+        </button>
       </div>
 
       <div class="register-section">
         <p class="register-text">¿No tienes cuenta?</p>
-        <ion-button expand="block" fill="outline" class="register-button" (click)="goToRegister()" [disabled]="isLoading">
-          Crear cuenta
-        </ion-button>
+        <button type="button" class="secondary-action" (click)="goToRegister()" [disabled]="isLoading">Crear cuenta</button>
       </div>
     </div>
   </div>

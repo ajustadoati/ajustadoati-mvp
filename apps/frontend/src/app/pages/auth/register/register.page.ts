@@ -53,7 +53,7 @@ export class RegisterPage implements OnInit {
   }
 
   onUserTypeChange(event: any) {
-    this.userType = event?.detail?.value ?? event?.target?.value ?? 'user';
+    this.userType = event.detail.value;
     this.updateProviderValidators();
     
     // Reset selected categories when switching user types
