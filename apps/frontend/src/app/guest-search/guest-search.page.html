@@ -18,24 +18,97 @@
   <section class="hero-section">
     <div class="hero-copy">
       <span class="eyebrow">Busqueda publica con GPS</span>
-      <h1>Encuentra servicios cercanos sin registrarte</h1>
+      <h1>Encuentra servicios cercanos</h1>
       <p>
-        Dinos que necesitas, elige una categoria y buscamos proveedores disponibles cerca de tu ubicacion.
+        Describe lo que necesitas y te mostramos en el mapa los proveedores disponibles cerca de ti.
       </p>
+
+      <div class="hero-actions">
+        <ion-button size="large" class="hero-primary" (click)="openSearchModal()">
+          <ion-icon name="search-outline" slot="start"></ion-icon>
+          Buscar servicio
+        </ion-button>
+      </div>
+    </div>
+  </section>
+
+  <section id="how-it-works" class="how-section">
+    <div class="section-heading">
+      <span>Como funciona</span>
+      <h2>Un flujo simple para clientes y proveedores</h2>
     </div>
 
-    <ion-card class="search-card">
-      <ion-card-content>
-        <div class="brand-block">
-          <img src="assets/images/logo.png" alt="AjustadoATi" />
-          <p>Los proveedores estan cerca. Empieza por tu necesidad.</p>
+    <div class="steps-grid">
+      <article>
+        <div class="step-icon client">
+          <ion-icon name="person-outline"></ion-icon>
+        </div>
+        <h3>El cliente publica su necesidad</h3>
+        <p>Describe el servicio y comparte su ubicación.</p>
+      </article>
+      <article>
+        <div class="step-icon provider">
+          <ion-icon name="business-outline"></ion-icon>
+        </div>
+        <h3>Los proveedores cercanos responden</h3>
+        <p>Los disponibles ven la solicitud y responden si pueden atenderla.</p>
+      </article>
+      <article>
+        <div class="step-icon contact">
+          <ion-icon name="logo-whatsapp"></ion-icon>
+        </div>
+        <h3>Ambos se contactan al instante</h3>
+        <p>El cliente ve quién respondió y puede escribirle por WhatsApp.</p>
+      </article>
+    </div>
+  </section>
+</ion-content>
+
+<ion-modal
+  [isOpen]="isSearchModalOpen"
+  cssClass="guest-search-modal"
+  [backdropDismiss]="false"
+  (didDismiss)="onModalDidDismiss()"
+>
+  <ng-template>
+    <ion-header class="modal-header">
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button *ngIf="modalStep === 'results'" fill="clear" (click)="backToForm()">
+            <ion-icon name="arrow-back-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+        <ion-title>{{ modalStep === 'form' ? 'Buscar servicio' : 'Proveedores cercanos' }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button fill="clear" (click)="closeSearchModal()">
+            <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="modal-content">
+      <div class="modal-stage" *ngIf="modalStep === 'form'">
+        <div class="modal-intro">
+          <span>Busqueda guiada</span>
+          <h2>Cuéntanos qué necesitas</h2>
+          <p>Al buscar activaremos tu ubicación para mostrar a los proveedores dónde te encuentras.</p>
+        </div>
+
+        <div class="search-helper-card">
+          <ion-icon name="logo-whatsapp"></ion-icon>
+          <p>
+            Cuando respondan, se irán agregando al mapa con su información principal para que puedas escribirles
+            directamente por WhatsApp.
+          </p>
         </div>
 
         <ion-item fill="outline" class="form-item">
-          <ion-label position="floating">Categoria del servicio</ion-label>
           <ion-select
             [(ngModel)]="selectedCategory"
             interface="popover"
+            label="Categoria del servicio"
+            labelPlacement="stacked"
             placeholder="Selecciona una categoria"
             [disabled]="isLoading || categories.length === 0"
             (ionChange)="onCategoryChange($event)"
@@ -48,83 +121,135 @@
         </ion-item>
 
         <ion-item fill="outline" class="form-item">
-          <ion-label position="floating">Que necesitas?</ion-label>
           <ion-textarea
             [(ngModel)]="serviceDescription"
-            placeholder="Ej: reparar una lavadora, plomero urgente, mudanza pequena"
-            rows="3"
+            label="Que necesitas?"
+            labelPlacement="stacked"
+            placeholder="Ej: instalar paneles solares, plomero urgente, mudanza pequena"
+            rows="4"
             maxlength="180"
             [counter]="true"
           ></ion-textarea>
         </ion-item>
 
-        <div class="location-panel" [class.ready]="userLocation" (click)="refreshLocation(true)">
+        <div class="location-panel" [class.ready]="userLocation">
           <div class="location-icon">
             <ion-icon [name]="userLocation ? 'location' : 'location-outline'"></ion-icon>
           </div>
           <div>
-            <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion requerida' }}</strong>
+            <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion pendiente' }}</strong>
             <span>{{ locationText }}</span>
           </div>
-          <ion-button fill="clear" size="small" type="button">
-            {{ userLocation ? 'Actualizar' : 'Activar' }}
+          <ion-button fill="solid" size="small" type="button" (click)="requestLocation(true)" [disabled]="isLocationLoading">
+            <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
+            <span *ngIf="!isLocationLoading">{{ userLocation ? 'Actualizar' : 'Usar mi ubicacion' }}</span>
           </ion-button>
         </div>
 
-        <ion-button
-          expand="block"
-          class="search-button"
-          (click)="onSearch()"
-          [disabled]="!canSearch || isLocationLoading"
-        >
-          <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
-          <ion-icon name="search-outline" slot="start" *ngIf="!isLocationLoading"></ion-icon>
+        <div class="inline-error" *ngIf="locationErrorMessage || searchErrorMessage">
+          {{ locationErrorMessage || searchErrorMessage }}
+        </div>
+
+        <ion-button expand="block" class="search-button" (click)="onSearch()" [disabled]="!canSearch || isLocationLoading">
+          <ion-icon name="search-outline" slot="start"></ion-icon>
           Buscar proveedores
         </ion-button>
-
-        <div class="guest-footnote">
-          <ion-icon name="information-circle-outline"></ion-icon>
-          <span>
-            Como invitado puedes ver proveedores cercanos. Para recibir respuestas en tiempo real, crea una cuenta.
-          </span>
-        </div>
-      </ion-card-content>
-    </ion-card>
-  </section>
-
-  <section id="how-it-works" class="how-section">
-    <div class="section-heading">
-      <span>Como funciona</span>
-      <h2>Un proceso rapido y directo</h2>
-    </div>
-
-    <div class="steps-grid">
-      <article>
-        <ion-icon name="search-outline"></ion-icon>
-        <h3>1. Busca</h3>
-        <p>Selecciona una categoria y describe lo que necesitas.</p>
-      </article>
-      <article>
-        <ion-icon name="location-outline"></ion-icon>
-        <h3>2. Usamos GPS</h3>
-        <p>La ubicacion permite encontrar proveedores cerca de ti.</p>
-      </article>
-      <article>
-        <ion-icon name="map-outline"></ion-icon>
-        <h3>3. Mira proveedores</h3>
-        <p>Te mostramos resultados cercanos y te invitamos a registrarte para continuar.</p>
-      </article>
-    </div>
-
-    <div class="register-cta">
-      <div>
-        <h3>Quieres que los proveedores te respondan en tiempo real?</h3>
-        <p>Crea tu cuenta gratuita y activa el flujo completo de solicitudes.</p>
       </div>
-      <ion-button color="success" (click)="goToRegister()">
-        <ion-icon name="person-add" slot="start"></ion-icon>
-        Crear cuenta
-      </ion-button>
-    </div>
-  </section>
-</ion-content>
+
+      <div class="modal-stage results-stage" *ngIf="modalStep === 'results'">
+        <div class="results-summary" *ngIf="currentSearchSession">
+          <h2>{{ currentSearchSession.searchRequest.productName }}</h2>
+          <div class="results-stats">
+            <span>{{ providersCount }} proveedores encontrados</span>
+            <span *ngIf="notifiedProvidersCount">• {{ notifiedProvidersCount }} notificados</span>
+            <span *ngIf="responsesCount">• {{ responsesCount }} respuestas</span>
+          </div>
+        </div>
+
+        <div class="inline-error" *ngIf="searchErrorMessage">{{ searchErrorMessage }}</div>
+
+        <div class="results-map-card">
+          <div class="map-card-header">
+            <h3>Mapa en tiempo real</h3>
+            <p>Azul: tu ubicación. Verde: proveedores cercanos. Naranja: proveedores que ya respondieron.</p>
+          </div>
+          <div id="guest-results-map" class="results-map"></div>
+          <div class="map-empty" *ngIf="!isMapReady">
+            Preparando mapa...
+          </div>
+          <div class="map-legend">
+            <div class="legend-item">
+              <span class="legend-dot user"></span>
+              <span>Tu ubicacion</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot provider"></span>
+              <span>Proveedor cercano</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot responded"></span>
+              <span>Proveedor que respondio</span>
+            </div>
+          </div>
+        </div>
+
+        <ion-card class="providers-list-card" *ngIf="currentSearchSession && providersCount > 0">
+          <ion-card-header>
+            <ion-card-title>Proveedores cercanos</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-list lines="full">
+              <ion-item *ngFor="let provider of currentSearchSession.providers; let i = index">
+                <ion-label>
+                  <h3>{{ i + 1 }}. {{ provider.name }}</h3>
+                  <p *ngIf="provider.locations && provider.locations.length > 0 && provider.locations[0].distance">
+                    {{ provider.locations[0].distance!.toFixed(1) }} km
+                  </p>
+                </ion-label>
+                <ion-badge slot="end" color="success" *ngIf="provider.rating">
+                  {{ provider.rating!.toFixed(1) }}
+                </ion-badge>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card class="responses-list-card" *ngIf="currentSearchSession">
+          <ion-card-header>
+            <ion-card-title>Respuestas de proveedores</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="empty-responses" *ngIf="responsesCount === 0">
+              <ion-icon name="information-circle-outline"></ion-icon>
+              <p>Aun no hay respuestas. Si llegan, las veras aqui sin salir del flujo.</p>
+            </div>
+
+            <ion-list lines="full" *ngIf="responsesCount > 0">
+              <ion-item *ngFor="let item of respondedProviders">
+                <ion-label>
+                  <h3>{{ item.response.providerName }}</h3>
+                  <p>{{ item.response.message }}</p>
+                  <p *ngIf="item.response.providerPhone"><strong>Telefono:</strong> {{ item.response.providerPhone }}</p>
+                  <a
+                    *ngIf="item.whatsappUrl"
+                    [href]="item.whatsappUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="whatsapp-link"
+                  >
+                    Escribir por WhatsApp
+                  </a>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+
+        <div class="results-actions">
+          <ion-button fill="outline" (click)="backToForm()">Nueva busqueda</ion-button>
+          <ion-button color="success" (click)="goToRegister()">Crear cuenta</ion-button>
+        </div>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

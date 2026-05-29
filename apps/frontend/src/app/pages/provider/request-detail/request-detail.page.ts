@@ -131,14 +131,7 @@ export class RequestDetailPage implements OnInit, OnDestroy {
         position: { lat: this.request.latitude, lng: this.request.longitude },
         map: this.map,
         title: 'Cliente',
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: '#3880ff',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2
-        }
+        icon: this.createPinIcon('#2563eb', 'C')
       });
       this.markers.push(clientMarker);
 
@@ -147,14 +140,7 @@ export class RequestDetailPage implements OnInit, OnDestroy {
           position: { lat: this.currentPosition.latitude, lng: this.currentPosition.longitude },
           map: this.map,
           title: 'Tu ubicación',
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 9,
-            fillColor: '#2dd36f',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
-          }
+          icon: this.createPinIcon('#16a34a', 'T')
         });
         this.markers.push(providerMarker);
 
@@ -162,11 +148,41 @@ export class RequestDetailPage implements OnInit, OnDestroy {
         const bounds = new google.maps.LatLngBounds();
         bounds.extend(clientMarker.getPosition());
         bounds.extend(providerMarker.getPosition());
-        this.map.fitBounds(bounds);
+        this.map.fitBounds(bounds, 80);
+        google.maps.event.addListenerOnce(this.map, 'idle', () => {
+          if (this.map && this.map.getZoom() > 15) {
+            this.map.setZoom(15);
+          }
+        });
+      } else if (this.map) {
+        this.map.setZoom(15);
       }
     } catch (error) {
       console.error('Error initializing map:', error);
     }
+  }
+
+  private createPinIcon(color: string, label: string) {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
+        <defs>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="rgba(15,23,42,0.28)"/>
+          </filter>
+        </defs>
+        <g filter="url(#shadow)">
+          <path d="M22 2C12.06 2 4 10.06 4 20c0 13.18 14.64 27.39 17.2 29.79a1.2 1.2 0 0 0 1.6 0C25.36 47.39 40 33.18 40 20 40 10.06 31.94 2 22 2Z" fill="${color}"/>
+          <circle cx="22" cy="20" r="11" fill="#ffffff" fill-opacity="0.95"/>
+          <text x="22" y="24.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="${color}">${label}</text>
+        </g>
+      </svg>
+    `.trim();
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize: new google.maps.Size(44, 52),
+      anchor: new google.maps.Point(22, 52)
+    };
   }
 
   private destroyMap() {

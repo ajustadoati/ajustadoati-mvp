@@ -4,7 +4,7 @@ import { AuthGuard } from './guards/auth.guard';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: '/guest-search',
+    loadComponent: () => import('./guest-search/guest-search.page').then( m => m.GuestSearchPage),
     pathMatch: 'full'
   },
   {
@@ -124,6 +124,7 @@ export const routes: Routes = [
   },
   {
     path: 'guest-search',
-    loadComponent: () => import('./guest-search/guest-search.page').then( m => m.GuestSearchPage)
+    redirectTo: '/',
+    pathMatch: 'full'
   }
 ];

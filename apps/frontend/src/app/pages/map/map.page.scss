@@ -95,7 +95,7 @@
 
   .map-container {
     width: 100%;
-    height: 300px;
+    height: clamp(360px, 52vh, 520px);
     border-radius: 8px;
     overflow: hidden;
     background-color: #e0e0e0;

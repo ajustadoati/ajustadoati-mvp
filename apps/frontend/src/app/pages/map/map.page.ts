@@ -228,7 +228,14 @@ export class MapPage implements OnInit, AfterViewInit, OnDestroy {
         this.markers.forEach(marker => {
           bounds.extend(marker.getPosition());
         });
-        this.map.fitBounds(bounds);
+        this.map.fitBounds(bounds, 80);
+        google.maps.event.addListenerOnce(this.map, 'idle', () => {
+          if (this.map && this.map.getZoom() > 15) {
+            this.map.setZoom(15);
+          }
+        });
+      } else if (this.map) {
+        this.map.setZoom(15);
       }
 
       this.isMapReady = true;
