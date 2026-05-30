@@ -2,6 +2,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { defineCustomElements } from '@ionic/core/loader';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
 
 import { routes } from './app/app.routes';
@@ -144,6 +145,10 @@ addIcons({
   'logo-google': logoGoogle,
   'logo-whatsapp': logoWhatsapp
 });
+
+if (typeof window !== 'undefined') {
+  defineCustomElements(window);
+}
 
 bootstrapApplication(AppComponent, {
   providers: [
