@@ -413,39 +413,89 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       return;
     }
 
+    const whatsappUrl = this.getWhatsAppUrl(response);
+
     const responseMarker = new google.maps.Marker({
       position: { lat: response.latitude, lng: response.longitude },
       map: this.map,
       title: `${response.providerName} respondio`,
-      icon: {
-        path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-        scale: 6,
-        fillColor: '#f97316',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-        rotation: 45
-      }
+      icon: this.buildResponseMarkerIcon(),
+      zIndex: 10
     });
 
-    const whatsappUrl = this.getWhatsAppUrl(response);
-    const safeMessage = (response.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
     const infoWindow = new google.maps.InfoWindow({
-      content: `
-        <div style="padding: 8px; min-width: 200px;">
-          <strong style="display:block; margin-bottom:4px;">${response.providerName}</strong>
-          <div style="font-size:12px; color:#475569; margin-bottom:6px;">Respondio a tu solicitud</div>
-          <div style="font-size:13px; line-height:1.45; margin-bottom:8px;">${safeMessage}</div>
-          ${response.providerPhone ? `<div style="font-size:12px; margin-bottom:8px;">WhatsApp: ${response.providerPhone}</div>` : ''}
-          ${whatsappUrl ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:8px 12px; background:#16a34a; color:#fff; text-decoration:none; border-radius:999px; font-size:12px; font-weight:700;">Escribir por WhatsApp</a>` : ''}
-        </div>
-      `
+      content: this.buildResponseInfoWindowContent(response, whatsappUrl)
     });
 
     responseMarker.addListener('click', () => infoWindow.open(this.map, responseMarker));
     this.markers.push(responseMarker);
     this.renderedResponseIds.add(response.id);
+  }
+
+  private buildResponseMarkerIcon(): object {
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 48" width="36" height="48">',
+        '<path d="M18 4C10 4 3 11 3 19c0 13 15 28 15 28S33 32 33 19C33 11 26 4 18 4z"',
+          ' fill="rgba(0,0,0,0.18)"/>',
+        '<path d="M18 1C9.7 1 3 7.7 3 16c0 13 15 30 15 30S33 29 33 16C33 7.7 26.3 1 18 1z"',
+          ' fill="#f97316" stroke="white" stroke-width="2.5"/>',
+        '<circle cx="18" cy="16" r="10" fill="white"/>',
+        '<path d="M13.5 16.5l3 3 6-6.5"',
+          ' stroke="#f97316" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+      '</svg>'
+    ].join('');
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize: new google.maps.Size(36, 48),
+      anchor: new google.maps.Point(18, 48)
+    };
+  }
+
+  private buildResponseInfoWindowContent(response: any, whatsappUrl: string | null): string {
+    const name = response.providerName || 'Proveedor';
+    const safeMessage = (response.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const chips = [
+      response.estimatedTime
+        ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f1f5f9;border-radius:999px;font-size:12px;font-weight:700;color:#334155;margin-right:6px;">⏱ ${response.estimatedTime} min</span>`
+        : '',
+      response.price
+        ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f0fdf4;border-radius:999px;font-size:12px;font-weight:700;color:#166534;">💰 $${response.price.toLocaleString()}</span>`
+        : ''
+    ].join('');
+
+    const waButton = whatsappUrl
+      ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer"
+           style="display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 14px;
+                  background:#16a34a;color:#fff;text-decoration:none;border-radius:12px;
+                  font-size:13px;font-weight:800;">
+           <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+             <path d="M17.47 14.38c-.28-.14-1.65-.81-1.9-.9-.26-.1-.44-.14-.63.14-.18.28-.72.9-.88 1.08-.16.18-.33.2-.61.07a7.7 7.7 0 0 1-2.27-1.4 8.5 8.5 0 0 1-1.57-1.95c-.16-.28-.02-.43.12-.57.13-.13.28-.33.42-.5.14-.17.18-.28.28-.47.09-.18.05-.35-.02-.49-.07-.14-.63-1.52-.86-2.08-.23-.55-.46-.47-.63-.48h-.54c-.18 0-.48.07-.73.35-.25.28-.97.95-.97 2.3 0 1.36.99 2.67 1.13 2.85.14.18 1.95 2.98 4.73 4.18.66.28 1.18.45 1.58.58.67.2 1.27.17 1.75.1.53-.08 1.65-.68 1.88-1.33.23-.65.23-1.2.16-1.32-.07-.11-.25-.18-.53-.32z"/>
+             <path d="M12 2a10 10 0 0 0-8.65 14.98L2 22l5.19-1.36A10 10 0 1 0 12 2zm0 18.18a8.18 8.18 0 0 1-4.17-1.14l-.3-.18-3.1.81.83-3.02-.2-.31A8.18 8.18 0 1 1 12 20.18z"/>
+           </svg>
+           Escribir por WhatsApp
+         </a>`
+      : '';
+
+    return [
+      '<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:14px 16px;min-width:230px;max-width:290px;">',
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">',
+          '<div style="width:38px;height:38px;background:#fff7ed;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid #fed7aa;">',
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="#f97316">',
+              '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>',
+            '</svg>',
+          '</div>',
+          '<div>',
+            `<div style="font-weight:800;font-size:14px;color:#0f172a;line-height:1.2;">${name}</div>`,
+            '<div style="font-size:11px;font-weight:700;color:#f97316;margin-top:3px;">✓ Respondió a tu solicitud</div>',
+          '</div>',
+        '</div>',
+        safeMessage ? `<p style="margin:0 0 10px;font-size:13px;color:#334155;line-height:1.5;">${safeMessage}</p>` : '',
+        chips ? `<div style="margin-bottom:10px;">${chips}</div>` : '',
+        waButton,
+      '</div>'
+    ].join('');
   }
 
   private clearMap() {
