@@ -415,15 +415,24 @@ export class SearchRequestService {
 
     this.guestResponsePollingTimer = setInterval(async () => {
       try {
-        const guestRequest = await this.fetchGuestRequestFromBackend(requestId);
         const currentSession = this.currentSearchSession$.value;
-        if (!currentSession || currentSession.searchRequest.id !== requestId) {
+        // Stop polling when session ends or offer was accepted
+        if (!currentSession || currentSession.searchRequest.id !== requestId || !currentSession.isActive) {
+          this.stopGuestResponsePolling();
           return;
         }
 
-        currentSession.responses = this.mapGuestResponses(guestRequest.responses || []);
-        currentSession.isActive = true;
-        this.currentSearchSession$.next({ ...currentSession });
+        const guestRequest = await this.fetchGuestRequestFromBackend(requestId);
+
+        // Re-check after async call in case state changed while awaiting
+        const sessionAfterFetch = this.currentSearchSession$.value;
+        if (!sessionAfterFetch || sessionAfterFetch.searchRequest.id !== requestId || !sessionAfterFetch.isActive) {
+          this.stopGuestResponsePolling();
+          return;
+        }
+
+        const newResponses = this.mapGuestResponses(guestRequest.responses || []);
+        this.currentSearchSession$.next({ ...sessionAfterFetch, responses: newResponses });
       } catch (error) {
         console.error('❌ Error polling guest responses:', error);
       }
@@ -468,6 +477,19 @@ export class SearchRequestService {
   }
 
   // =================== OBSERVABLES PÚBLICOS ===================
+
+  /**
+   * Notificar al backend que el guest aceptó una respuesta de proveedor.
+   * El backend envía el mensaje offer_accepted por WebSocket al proveedor.
+   */
+  async acceptGuestResponse(requestId: string, responseId: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post<any>(
+        `${environment.baseUrl}/guest-requests/${requestId}/responses/${responseId}/accept`,
+        {}
+      )
+    );
+  }
 
   /**
    * Obtener sesión de búsqueda actual

@@ -85,6 +85,53 @@ public class GuestRequestService {
         return sessions.containsKey(requestId);
     }
 
+    public int acceptResponse(UUID requestId, UUID responseId) {
+        GuestRequestSession session = sessions.get(requestId);
+        if (session == null) {
+            throw new RuntimeException("Guest request not found: " + requestId);
+        }
+
+        GuestRequestResponseDto response = session.responses.stream()
+                .filter(r -> r.id().equals(responseId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Response not found: " + responseId));
+
+        synchronized (session) {
+            session.status = "accepted";
+            session.updatedAt = LocalDateTime.now();
+        }
+
+        return notifyProviderOfAcceptance(session, response);
+    }
+
+    private int notifyProviderOfAcceptance(GuestRequestSession session, GuestRequestResponseDto response) {
+        if (response.providerEmail() == null) {
+            log.warn("Cannot notify provider: no email on response {}", response.id());
+            return 0;
+        }
+
+        WebSocketDto.OutgoingMessage message = WebSocketDto.OutgoingMessage.builder()
+                .type("offer_accepted")
+                .fromUser(session.guestRef)
+                .user(session.guestRef)
+                .message("Tu oferta ha sido aceptada")
+                .requestId(session.id)
+                .offerId(response.id().toString())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        List<WebSocketSession> providerSessions = connectionRegistry.getUserSessions(response.providerEmail());
+        int sent = 0;
+        for (WebSocketSession ws : providerSessions) {
+            if (sendMessageToSession(ws, message)) {
+                sent++;
+            }
+        }
+
+        log.info("Guest acceptance for request {} notified {} provider session(s) for {}", session.id, sent, response.providerEmail());
+        return sent;
+    }
+
     public void recordProviderResponse(UUID requestId, WebSocketDto.ProviderInfo providerInfo, WebSocketDto.IncomingMessage message) {
         GuestRequestSession session = sessions.get(requestId);
         if (session == null) {

@@ -57,4 +57,22 @@ public class GuestRequestController {
                     .body(ApiResponse.error(e.getMessage()));
         }
     }
+
+    @PostMapping("/{requestId}/responses/{responseId}/accept")
+    public ResponseEntity<ApiResponse<Void>> acceptGuestResponse(
+            @PathVariable UUID requestId,
+            @PathVariable UUID responseId
+    ) {
+        try {
+            int notified = guestRequestService.acceptResponse(requestId, responseId);
+            String msg = notified > 0
+                    ? "Oferta aceptada. Proveedor notificado."
+                    : "Oferta aceptada. El proveedor sera notificado cuando se conecte.";
+            return ResponseEntity.ok(ApiResponse.success(msg, null));
+        } catch (Exception e) {
+            log.error("Error accepting guest response {} for request {}", responseId, requestId, e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        }
+    }
 }

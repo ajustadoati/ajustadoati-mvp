@@ -7,14 +7,19 @@ import { Subscription, firstValueFrom } from 'rxjs';
 import { addIcons } from 'ionicons';
 import {
   arrowBackOutline,
+  cashOutline,
+  checkmarkCircleOutline,
   closeOutline,
   informationCircleOutline,
   location,
   locationOutline,
   logInOutline,
+  logoWhatsapp,
   mapOutline,
   personAdd,
-  searchOutline
+  personCircleOutline,
+  searchOutline,
+  timeOutline
 } from 'ionicons/icons';
 import { CategoryService } from '../services/category.service';
 import { GeolocationService, UserLocation } from '../services/geolocation.service';
@@ -50,6 +55,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   private map: any = null;
   private markers: any[] = [];
   private lastMapSignature = '';
+  private renderedResponseIds = new Set<string>();
 
   constructor(
     private router: Router,
@@ -63,14 +69,19 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   ) {
     addIcons({
       arrowBackOutline,
+      cashOutline,
+      checkmarkCircleOutline,
       closeOutline,
       informationCircleOutline,
       location,
       locationOutline,
       logInOutline,
+      logoWhatsapp,
       mapOutline,
       personAdd,
-      searchOutline
+      personCircleOutline,
+      searchOutline,
+      timeOutline
     });
   }
 
@@ -102,8 +113,13 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       if (session && this.modalStep === 'results') {
         const signature = this.buildMapSignature(session);
         if (signature !== this.lastMapSignature) {
+          // New search or provider list changed — full map reinit
           this.lastMapSignature = signature;
+          this.renderedResponseIds.clear();
           setTimeout(() => this.initializeResultsMap(), 200);
+        } else if (this.map) {
+          // Same search, map already exists — only add new response markers
+          this.addNewResponseMarkers(session);
         }
       }
     });
@@ -368,40 +384,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       });
     }
 
-    responsesWithCoords.forEach(response => {
-      const responseMarker = new google.maps.Marker({
-        position: { lat: response.latitude, lng: response.longitude },
-        map: this.map,
-        title: `${response.providerName} respondio`,
-        icon: {
-          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale: 6,
-          fillColor: '#f97316',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          rotation: 45
-        }
-      });
-
-      const whatsappUrl = this.getWhatsAppUrl(response);
-      const safeMessage = (response.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="padding: 8px; min-width: 200px;">
-            <strong style="display:block; margin-bottom:4px;">${response.providerName}</strong>
-            <div style="font-size:12px; color:#475569; margin-bottom:6px;">Respondio a tu solicitud</div>
-            <div style="font-size:13px; line-height:1.45; margin-bottom:8px;">${safeMessage}</div>
-            ${response.providerPhone ? `<div style="font-size:12px; margin-bottom:8px;">WhatsApp: ${response.providerPhone}</div>` : ''}
-            ${whatsappUrl ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:8px 12px; background:#16a34a; color:#fff; text-decoration:none; border-radius:999px; font-size:12px; font-weight:700;">Escribir por WhatsApp</a>` : ''}
-          </div>
-        `
-      });
-
-      responseMarker.addListener('click', () => infoWindow.open(this.map, responseMarker));
-      this.markers.push(responseMarker);
-    });
+    responsesWithCoords.forEach(response => this.addResponseMarkerToMap(response));
 
     if (this.markers.length > 1) {
       const bounds = new google.maps.LatLngBounds();
@@ -419,11 +402,58 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     this.isMapReady = true;
   }
 
+  private addNewResponseMarkers(session: SearchSession): void {
+    (session.responses || [])
+      .filter(r => !this.renderedResponseIds.has(r.id) && typeof r.latitude === 'number' && typeof r.longitude === 'number')
+      .forEach(r => this.addResponseMarkerToMap(r));
+  }
+
+  private addResponseMarkerToMap(response: any): void {
+    if (typeof response.latitude !== 'number' || typeof response.longitude !== 'number' || !this.map) {
+      return;
+    }
+
+    const responseMarker = new google.maps.Marker({
+      position: { lat: response.latitude, lng: response.longitude },
+      map: this.map,
+      title: `${response.providerName} respondio`,
+      icon: {
+        path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+        scale: 6,
+        fillColor: '#f97316',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+        rotation: 45
+      }
+    });
+
+    const whatsappUrl = this.getWhatsAppUrl(response);
+    const safeMessage = (response.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="padding: 8px; min-width: 200px;">
+          <strong style="display:block; margin-bottom:4px;">${response.providerName}</strong>
+          <div style="font-size:12px; color:#475569; margin-bottom:6px;">Respondio a tu solicitud</div>
+          <div style="font-size:13px; line-height:1.45; margin-bottom:8px;">${safeMessage}</div>
+          ${response.providerPhone ? `<div style="font-size:12px; margin-bottom:8px;">WhatsApp: ${response.providerPhone}</div>` : ''}
+          ${whatsappUrl ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:8px 12px; background:#16a34a; color:#fff; text-decoration:none; border-radius:999px; font-size:12px; font-weight:700;">Escribir por WhatsApp</a>` : ''}
+        </div>
+      `
+    });
+
+    responseMarker.addListener('click', () => infoWindow.open(this.map, responseMarker));
+    this.markers.push(responseMarker);
+    this.renderedResponseIds.add(response.id);
+  }
+
   private clearMap() {
     this.markers.forEach(marker => marker?.setMap?.(null));
     this.markers = [];
     this.map = null;
     this.isMapReady = false;
+    this.renderedResponseIds.clear();
   }
 
   private buildMapSignature(session: SearchSession): string {
@@ -434,11 +464,9 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       })
       .join('|');
 
-    const responseCoords = (session.responses || [])
-      .map(response => `${response.providerId}:${response.latitude ?? 'na'},${response.longitude ?? 'na'}:${response.providerPhone ?? ''}`)
-      .join('|');
-
-    return `${session.searchRequest.id}:${session.searchRequest.userLatitude},${session.searchRequest.userLongitude}:${providerCoords}:${responseCoords}`;
+    // Responses are handled incrementally via addNewResponseMarkers — excluded from signature
+    // to avoid triggering a full map reinit each time a provider responds.
+    return `${session.searchRequest.id}:${session.searchRequest.userLatitude},${session.searchRequest.userLongitude}:${providerCoords}`;
   }
 
   private matchesResponseToProvider(provider: any, response: any): boolean {
@@ -451,6 +479,46 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     }
 
     return response.providerName === provider.name;
+  }
+
+  get hasAcceptedOffer(): boolean {
+    return !!this.currentSearchSession?.acceptedResponse;
+  }
+
+  isResponseAccepted(responseId: string): boolean {
+    return this.currentSearchSession?.acceptedResponse?.id === responseId;
+  }
+
+  async acceptGuestOffer(response: any) {
+    const priceInfo = response.price ? `\nPrecio: $${response.price.toLocaleString()}` : '';
+    const timeInfo = response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : '';
+
+    const alert = await this.alertController.create({
+      header: 'Aceptar oferta',
+      message: `¿Quieres aceptar la oferta de ${response.providerName}?${priceInfo}${timeInfo}`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Aceptar',
+          handler: () => this.confirmGuestAccept(response)
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  private confirmGuestAccept(response: any): void {
+    // Update local session state immediately so UI reflects acceptance
+    this.searchRequestService.acceptProviderResponse(response.id);
+    this.showToast('¡Oferta aceptada! Contacta al proveedor para coordinar.', 'success');
+
+    // Notify backend so it forwards offer_accepted to the provider via WebSocket
+    const requestId = this.currentSearchSession?.searchRequest.id;
+    if (requestId) {
+      this.searchRequestService
+        .acceptGuestResponse(requestId, response.id)
+        .catch(err => console.warn('Could not notify provider of acceptance:', err));
+    }
   }
 
   getWhatsAppUrl(response: { providerPhone?: string; providerName?: string }): string | null {

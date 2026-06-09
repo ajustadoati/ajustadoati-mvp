@@ -214,36 +214,77 @@
           </ion-card-content>
         </ion-card>
 
-        <ion-card class="responses-list-card" *ngIf="currentSearchSession">
-          <ion-card-header>
-            <ion-card-title>Respuestas de proveedores</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="empty-responses" *ngIf="responsesCount === 0">
-              <ion-icon name="information-circle-outline"></ion-icon>
-              <p>Aun no hay respuestas. Si llegan, las veras aqui sin salir del flujo.</p>
-            </div>
+        <div class="responses-section" *ngIf="currentSearchSession">
+          <h3 class="responses-heading">Respuestas de proveedores</h3>
 
-            <ion-list lines="full" *ngIf="responsesCount > 0">
-              <ion-item *ngFor="let item of respondedProviders">
-                <ion-label>
-                  <h3>{{ item.response.providerName }}</h3>
-                  <p>{{ item.response.message }}</p>
-                  <p *ngIf="item.response.providerPhone"><strong>Telefono:</strong> {{ item.response.providerPhone }}</p>
-                  <a
-                    *ngIf="item.whatsappUrl"
-                    [href]="item.whatsappUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="whatsapp-link"
-                  >
-                    Escribir por WhatsApp
-                  </a>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
+          <div class="empty-responses" *ngIf="responsesCount === 0">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <p>Aun no hay respuestas. Si llegan, las veras aqui sin salir del flujo.</p>
+          </div>
+
+          <ion-card
+            class="response-card"
+            *ngFor="let item of respondedProviders"
+            [class.response-card--accepted]="isResponseAccepted(item.response.id)"
+          >
+            <ion-card-content>
+              <div class="response-header">
+                <div class="response-provider-info">
+                  <ion-icon name="person-circle-outline" class="response-avatar"></ion-icon>
+                  <div>
+                    <strong>{{ item.response.providerName }}</strong>
+                    <span *ngIf="item.response.providerPhone" class="response-phone">{{ item.response.providerPhone }}</span>
+                  </div>
+                </div>
+                <ion-badge color="success" *ngIf="isResponseAccepted(item.response.id)">Aceptada</ion-badge>
+              </div>
+
+              <p class="response-message" *ngIf="item.response.message">{{ item.response.message }}</p>
+
+              <div class="response-details" *ngIf="item.response.estimatedTime || item.response.price">
+                <span class="detail-chip" *ngIf="item.response.estimatedTime">
+                  <ion-icon name="time-outline"></ion-icon>
+                  {{ item.response.estimatedTime }} min
+                </span>
+                <span class="detail-chip" *ngIf="item.response.price">
+                  <ion-icon name="cash-outline"></ion-icon>
+                  ${{ item.response.price | number }}
+                </span>
+              </div>
+
+              <div class="response-actions" *ngIf="!hasAcceptedOffer">
+                <ion-button fill="solid" color="primary" expand="block" (click)="acceptGuestOffer(item.response)">
+                  <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                  Aceptar oferta
+                </ion-button>
+                <a
+                  *ngIf="item.whatsappUrl"
+                  [href]="item.whatsappUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="whatsapp-link"
+                >
+                  <ion-icon name="logo-whatsapp"></ion-icon>
+                  Escribir por WhatsApp
+                </a>
+              </div>
+
+              <div class="response-accepted-actions" *ngIf="isResponseAccepted(item.response.id)">
+                <p class="accepted-message">¡Oferta aceptada! Coordina con el proveedor directamente.</p>
+                <a
+                  *ngIf="item.whatsappUrl"
+                  [href]="item.whatsappUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="whatsapp-link whatsapp-link--primary"
+                >
+                  <ion-icon name="logo-whatsapp"></ion-icon>
+                  Escribir por WhatsApp
+                </a>
+              </div>
+            </ion-card-content>
+          </ion-card>
+        </div>
 
         <div class="results-actions">
           <ion-button fill="outline" (click)="backToForm()">Nueva busqueda</ion-button>
