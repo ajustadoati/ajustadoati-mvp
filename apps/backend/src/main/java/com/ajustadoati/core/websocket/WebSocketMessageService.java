@@ -195,28 +195,32 @@ public class WebSocketMessageService {
                     .providerInfo(providerInfoDto)
                     .build();
 
+            log.info("[RESPUESTA] proveedor={} → peticion={} | lat={} lon={}",
+                    providerInfo.getEmail(), message.getRequestId(),
+                    message.getLatitude(), message.getLongitude());
+
             if (message.getRequestId() != null && guestRequestService.hasGuestRequest(message.getRequestId())) {
                 guestRequestService.recordProviderResponse(message.getRequestId(), providerInfoDto, message);
-                log.info("Stored provider response for guest request {}", message.getRequestId());
             }
-            
-            // Enviar respuesta al usuario original (buscar por el email de toUsers o usar lógica específica)
+
+            int delivered = 0;
             if (message.getToUsers() != null && !message.getToUsers().isEmpty()) {
                 for (String userEmail : message.getToUsers()) {
                     List<WebSocketSession> userSessions = connectionRegistry.getUserSessions(userEmail);
                     for (WebSocketSession userSession : userSessions) {
-                        sendMessageToSession(userSession, responseMessage);
+                        if (sendMessageToSession(userSession, responseMessage)) delivered++;
                     }
                 }
             }
-            
-            // Confirmar al proveedor que se envió la respuesta
+            log.info("[RESPUESTA] peticion={} | entregada a {} sesion(es) de usuario",
+                    message.getRequestId(), delivered);
+
             WebSocketDto.OutgoingMessage confirmation = WebSocketDto.OutgoingMessage.builder()
                     .type("notification")
                     .message("Your response has been sent to the customer")
                     .timestamp(LocalDateTime.now())
                     .build();
-            
+
             sendMessageToSession(session, confirmation);
             
         } catch (Exception e) {
@@ -277,6 +281,8 @@ public class WebSocketMessageService {
                         sentCount++;
                     }
                 }
+                log.info("[OFERTA-ACEPTADA] peticion={} | proveedor={} | sesiones-notificadas={}",
+                        message.getRequestId(), providerEmail, sentCount);
             }
 
             WebSocketDto.OutgoingMessage confirmation = WebSocketDto.OutgoingMessage.builder()

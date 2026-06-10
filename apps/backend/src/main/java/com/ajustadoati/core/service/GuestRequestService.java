@@ -163,8 +163,13 @@ public class GuestRequestService {
 
             if (existingIndex >= 0) {
                 session.responses.set(existingIndex, response);
+                log.info("[RESPUESTA] peticion={} | proveedor={} | actualizada (ya habia respondido)",
+                        requestId, providerEmail);
             } else {
                 session.responses.add(0, response);
+                log.info("[RESPUESTA] peticion={} | proveedor={} | mensaje=\"{}\" | lat={} lon={}",
+                        requestId, providerEmail, message.getMessage(),
+                        message.getLatitude(), message.getLongitude());
             }
 
             session.status = "responded";
@@ -173,6 +178,10 @@ public class GuestRequestService {
     }
 
     private int notifyProviders(GuestRequestSession session) {
+        log.info("[PETICION] id={} | categoria={} ({}) | lat={} lon={} | radio={}km",
+                session.id, session.categoryId, session.categoryName,
+                session.latitude, session.longitude, session.maxDistanceKm);
+
         List<WebSocketSession> providerSessions = connectionRegistry.getProviderSessions(
                 session.categoryId,
                 session.latitude,
@@ -181,7 +190,7 @@ public class GuestRequestService {
         );
 
         if (providerSessions.isEmpty()) {
-            log.info("No connected providers available for guest request {}", session.id);
+            log.info("[PETICION] {} → 0 proveedores conectados disponibles", session.id);
             return 0;
         }
 
@@ -203,10 +212,16 @@ public class GuestRequestService {
         for (WebSocketSession providerSession : providerSessions) {
             if (sendMessageToSession(providerSession, providerMessage)) {
                 successfulSends++;
+                log.info("[ENVIADO] peticion {} → session={}", session.id,
+                        providerSession.getId().substring(0, 8));
+            } else {
+                log.warn("[ERROR-ENVIO] peticion {} → session={} falló",
+                        session.id, providerSession.getId().substring(0, 8));
             }
         }
 
-        log.info("Guest request {} sent to {} connected provider sessions", session.id, successfulSends);
+        log.info("[PETICION] {} → notificados {}/{} proveedores",
+                session.id, successfulSends, providerSessions.size());
         return successfulSends;
     }
 

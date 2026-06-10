@@ -261,15 +261,42 @@ export class ProviderProfilePage implements OnInit {
     try {
       this.currentPosition = await this.geolocation.getCurrentPosition();
 
-      if (this.currentPosition) {
+      if (!this.currentPosition) {
         await loading.dismiss();
-        await this.showToast('Ubicación actualizada (solo en esta sesión).', 'success');
-
-        // Update address in form
-        if (this.currentPosition.address) {
-          this.profileForm.patchValue({ address: this.currentPosition.address });
-        }
+        await this.showToast('No se pudo obtener la ubicación del dispositivo', 'warning');
+        return;
       }
+
+      const formValue = this.profileForm.getRawValue();
+      const updatedUser = await this.backendAuth.updateProfile({
+        fullName: formValue.name || this.user?.fullName || '',
+        phone: formValue.phone || this.user?.phone || '',
+        categories: this.selectedCategories,
+        location: {
+          latitude: this.currentPosition.latitude,
+          longitude: this.currentPosition.longitude,
+          address: (this.currentPosition as any).address || formValue.address || null,
+          city: this.user?.location?.city || null,
+          state: this.user?.location?.state || null,
+          country: this.user?.location?.country || null
+        }
+      });
+
+      this.user = updatedUser;
+      if ((this.currentPosition as any).address) {
+        this.profileForm.patchValue({ address: (this.currentPosition as any).address });
+      }
+
+      // Reconnect WebSocket so the registry picks up the new location in SessionInfo
+      try {
+        this.websocket.disconnect();
+        await this.websocket.connect();
+      } catch (socketError) {
+        console.warn('Location saved but WebSocket refresh failed:', socketError);
+      }
+
+      await loading.dismiss();
+      await this.showToast('Ubicación actualizada y guardada correctamente', 'success');
     } catch (error) {
       await loading.dismiss();
       console.error('Error updating location:', error);

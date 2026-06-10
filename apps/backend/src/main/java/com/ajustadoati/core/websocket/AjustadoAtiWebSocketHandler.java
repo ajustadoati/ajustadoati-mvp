@@ -111,8 +111,9 @@ public class AjustadoAtiWebSocketHandler extends TextWebSocketHandler {
             // Enviar confirmación de conexión exitosa
             sendConnectionResponse(session, "authenticated", "Successfully connected to WebSocket", profile.getEmail());
             
-            log.info("User authenticated and registered - Username: {}, Email: {}, IsProvider: {}, SessionId: {}", 
-                    username, profile.getEmail(), profile.getIsProvider(), session.getId());
+            log.info("[WS-AUTH] {} | proveedor={} | categorias={} | session={}",
+                    profile.getEmail(), profile.getIsProvider(),
+                    categoriesCopy, session.getId().substring(0, 8));
             
         } catch (Exception e) {
             log.error("Error establishing WebSocket connection for session: {}", session.getId(), e);

@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { AlertController, LoadingController, ToastController } from '@ionic/angular';
 import { BackendAuthService, BackendRegisterRequest } from '../../../services/backend-auth.service';
 import { CategoryService } from '../../../services/category.service';
+import { GeolocationService } from '../../../services/geolocation.service';
 import { Category } from '../../../interfaces/category';
 import { firstValueFrom } from 'rxjs';
 
@@ -28,6 +29,7 @@ export class RegisterPage implements OnInit {
     private fb: FormBuilder,
     private backendAuth: BackendAuthService,
     private categoryService: CategoryService,
+    private geolocationService: GeolocationService,
     private router: Router,
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController,
@@ -108,21 +110,28 @@ export class RegisterPage implements OnInit {
     try {
       const formData = this.registerForm.value;
       console.log('📝 Attempting registration for:', formData.email);
-      
+
+      // Try to get the device's real location; fall back to null so the
+      // provider can set it later from their profile instead of being
+      // registered with wrong coordinates.
+      let location: { latitude: number; longitude: number; address?: string } | null = null;
+      try {
+        const pos = await this.geolocationService.getCurrentPosition();
+        location = { latitude: pos.lat, longitude: pos.lng };
+      } catch {
+        console.warn('Geolocation unavailable during registration; location will be null');
+      }
+
       // Prepare user data for backend registration
       const userData: BackendRegisterRequest = {
         email: formData.email,
         password: formData.password,
-        fullName: formData.email.split('@')[0], // Use email username as name
+        fullName: formData.email.split('@')[0],
         username: this.generateValidUsername(formData.email),
         phone: formData.phone,
         isProvider: formData.userType === 'provider',
         categories: formData.userType === 'provider' ? this.selectedCategories : [],
-        location: {
-          latitude: -33.4489, // Default location (Santiago, Chile)
-          longitude: -70.6693,
-          address: 'Santiago, Chile'
-        }
+        location: location as any
       };
       
       // Register user with backend

@@ -37,21 +37,28 @@ public class ConnectionRegistry {
     public void addConnection(WebSocketSession session, WebSocketDto.SessionInfo sessionInfo) {
         String sessionId = session.getId();
         String userEmail = sessionInfo.getEmail();
-        
+
         try {
-            // Almacenar información de sesión
-            sessions.put(sessionId, sessionInfo);
+            // Register WebSocket session first so it is always present when SessionInfo is visible
             webSocketSessions.put(sessionId, session);
-            
-            // Agregar a índice por usuario
+            sessions.put(sessionId, sessionInfo);
             userSessions.computeIfAbsent(userEmail, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
-            
-            // Actualizar métricas
             totalConnectionsCreated++;
-            
-            log.info("Connection registered - SessionId: {}, User: {}, IsProvider: {}, TotalActive: {}", 
-                    sessionId, userEmail, sessionInfo.getIsProvider(), sessions.size());
-            
+
+            String locationInfo = sessionInfo.getLocation() != null
+                    ? String.format("lat=%.4f lon=%.4f",
+                            sessionInfo.getLocation().getLatitude().doubleValue(),
+                            sessionInfo.getLocation().getLongitude().doubleValue())
+                    : "sin-ubicacion";
+
+            log.info("[CONECTADO] {} | proveedor={} | categorias={} | {} | session={} | activos={}",
+                    userEmail,
+                    sessionInfo.getIsProvider(),
+                    sessionInfo.getCategories(),
+                    locationInfo,
+                    sessionId.substring(0, 8),
+                    sessions.size());
+
         } catch (Exception e) {
             log.error("Error registering connection for user: {}", userEmail, e);
             throw new RuntimeException("Failed to register connection", e);
@@ -80,8 +87,8 @@ public class ConnectionRegistry {
                     }
                 }
                 
-                log.info("Connection removed - SessionId: {}, User: {}, RemainingActive: {}", 
-                        sessionId, userEmail, sessions.size());
+                log.info("[DESCONECTADO] {} | session={} | activos={}",
+                        userEmail, sessionId.substring(0, 8), sessions.size());
             }
             
         } catch (Exception e) {
@@ -116,28 +123,54 @@ public class ConnectionRegistry {
      * Obtiene las sesiones de proveedores activos por categoría y ubicación
      */
     public List<WebSocketSession> getProviderSessions(Integer categoryId, Double latitude, Double longitude, Double maxDistanceKm) {
-        return sessions.values().stream()
-                .filter(sessionInfo -> sessionInfo.getIsProvider())
-                .filter(sessionInfo -> categoryId == null || 
-                        (sessionInfo.getCategories() != null && sessionInfo.getCategories().contains(categoryId)))
-                .filter(sessionInfo -> {
-                    if (latitude == null || longitude == null || maxDistanceKm == null || sessionInfo.getLocation() == null) {
-                        return true; // Sin filtro de distancia
-                    }
-                    
-                    // Calcular distancia usando fórmula haversine
-                    double distance = calculateDistance(
-                            latitude, longitude,
-                            sessionInfo.getLocation().getLatitude().doubleValue(),
-                            sessionInfo.getLocation().getLongitude().doubleValue()
-                    );
-                    
-                    return distance <= maxDistanceKm;
-                })
-                .map(sessionInfo -> webSocketSessions.get(sessionInfo.getSessionId()))
-                .filter(Objects::nonNull)
-                .filter(WebSocketSession::isOpen)
-                .collect(Collectors.toList());
+        List<WebSocketDto.SessionInfo> allSessions = new ArrayList<>(sessions.values());
+        log.info("[BUSQUEDA-PROVEEDORES] categoria={} | sesiones-totales={}", categoryId, allSessions.size());
+
+        List<WebSocketSession> result = new ArrayList<>();
+
+        for (WebSocketDto.SessionInfo info : allSessions) {
+            String email = info.getEmail();
+
+            if (!Boolean.TRUE.equals(info.getIsProvider())) {
+                log.debug("[FILTRO] {} → descartado (no es proveedor)", email);
+                continue;
+            }
+
+            if (categoryId != null) {
+                List<Integer> cats = info.getCategories();
+                if (cats == null || !cats.contains(categoryId)) {
+                    log.info("[FILTRO] {} → descartado (categoria {} no en {})", email, categoryId, cats);
+                    continue;
+                }
+            }
+
+            if (latitude != null && longitude != null && maxDistanceKm != null && info.getLocation() != null) {
+                double distance = calculateDistance(
+                        latitude, longitude,
+                        info.getLocation().getLatitude().doubleValue(),
+                        info.getLocation().getLongitude().doubleValue());
+                if (distance > maxDistanceKm) {
+                    log.info("[FILTRO] {} → descartado ({} km > radio {} km)",
+                            email, Math.round(distance), Math.round(maxDistanceKm));
+                    continue;
+                }
+                log.info("[FILTRO] {} → OK ({} km)", email, Math.round(distance));
+            } else {
+                log.info("[FILTRO] {} → OK (sin filtro de distancia)", email);
+            }
+
+            WebSocketSession ws = webSocketSessions.get(info.getSessionId());
+            if (ws == null || !ws.isOpen()) {
+                log.warn("[FILTRO] {} → descartado (sesion WS cerrada o nula)", email);
+                continue;
+            }
+
+            result.add(ws);
+        }
+
+        log.info("[BUSQUEDA-PROVEEDORES] resultado: {}/{} proveedores seleccionados",
+                result.size(), allSessions.stream().filter(s -> Boolean.TRUE.equals(s.getIsProvider())).count());
+        return result;
     }
     
     /**
