@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'io.ionic.starter',
-  appName: 'ajustadoati-ionic7',
+  appId: 'com.ajustadoati.app',
+  appName: 'AjustadoATi',
   webDir: 'www'
 };
 
