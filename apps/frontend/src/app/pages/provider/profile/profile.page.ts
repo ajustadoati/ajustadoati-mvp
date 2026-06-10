@@ -275,7 +275,7 @@ export class ProviderProfilePage implements OnInit {
         location: {
           latitude: this.currentPosition.latitude,
           longitude: this.currentPosition.longitude,
-          address: (this.currentPosition as any).address || formValue.address || null,
+          address: formValue.address || this.user?.location?.address || null,
           city: this.user?.location?.city || null,
           state: this.user?.location?.state || null,
           country: this.user?.location?.country || null
@@ -283,9 +283,6 @@ export class ProviderProfilePage implements OnInit {
       });
 
       this.user = updatedUser;
-      if ((this.currentPosition as any).address) {
-        this.profileForm.patchValue({ address: (this.currentPosition as any).address });
-      }
 
       // Reconnect WebSocket so the registry picks up the new location in SessionInfo
       try {
@@ -296,7 +293,10 @@ export class ProviderProfilePage implements OnInit {
       }
 
       await loading.dismiss();
-      await this.showToast('Ubicación actualizada y guardada correctamente', 'success');
+      await this.showToast(
+        `Ubicación GPS guardada: ${this.currentPosition.latitude.toFixed(4)}, ${this.currentPosition.longitude.toFixed(4)}`,
+        'success'
+      );
     } catch (error) {
       await loading.dismiss();
       console.error('Error updating location:', error);
