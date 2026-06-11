@@ -1,0 +1,141 @@
+.admin-container {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.loading-state,
+.forbidden-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: #64748b;
+
+  ion-icon {
+    font-size: 48px;
+  }
+
+  h2 {
+    margin: 0;
+    color: #0f172a;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.inline-error {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 12px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+
+  ion-icon {
+    font-size: 26px;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+    text-align: center;
+  }
+}
+
+.section-card {
+  border-radius: 20px;
+  margin: 0 0 16px;
+}
+
+.empty-text {
+  margin: 0;
+  color: #64748b;
+}
+
+.provider-row,
+.demo-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.provider-main,
+.demo-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+
+  strong {
+    color: #0f172a;
+  }
+}
+
+.provider-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .connection-dot {
+    font-size: 10px;
+  }
+}
+
+.provider-meta {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.provider-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.category-chip {
+  height: 22px;
+  font-size: 0.72rem;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+.provider-status {
+  flex-shrink: 0;
+}

@@ -1,0 +1,120 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Backoffice</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="loadData()" [disabled]="isLoading">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="admin-container">
+
+    <div class="loading-state" *ngIf="isLoading">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Cargando información...</p>
+    </div>
+
+    <div class="forbidden-state" *ngIf="isForbidden">
+      <ion-icon name="close-circle" color="danger"></ion-icon>
+      <h2>No autorizado</h2>
+      <p>Tu cuenta no tiene acceso al backoffice.</p>
+    </div>
+
+    <div class="inline-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+    <ng-container *ngIf="!isLoading && !isForbidden && stats">
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <ion-icon name="business-outline" color="primary"></ion-icon>
+          <span class="stat-value">{{ stats.totalProviders }}</span>
+          <span class="stat-label">Proveedores</span>
+        </div>
+        <div class="stat-card">
+          <ion-icon name="wifi-outline" color="success"></ion-icon>
+          <span class="stat-value">{{ stats.connectedProviders }}</span>
+          <span class="stat-label">Conectados ahora</span>
+        </div>
+        <div class="stat-card">
+          <ion-icon name="people-outline" color="tertiary"></ion-icon>
+          <span class="stat-value">{{ stats.totalUsers }}</span>
+          <span class="stat-label">Usuarios</span>
+        </div>
+        <div class="stat-card">
+          <ion-icon name="flask-outline" color="warning"></ion-icon>
+          <span class="stat-value">{{ stats.demoRequestsResponded }}/{{ stats.demoRequestsSent }}</span>
+          <span class="stat-label">Demos respondidas</span>
+        </div>
+      </div>
+
+      <!-- Providers -->
+      <ion-card class="section-card">
+        <ion-card-header>
+          <ion-card-title>Proveedores registrados</ion-card-title>
+          <ion-card-subtitle>Ordenados por fecha de registro (más reciente primero)</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <p class="empty-text" *ngIf="providers.length === 0">Aún no hay proveedores registrados.</p>
+
+          <div class="provider-row" *ngFor="let provider of providers">
+            <div class="provider-main">
+              <div class="provider-name-line">
+                <ion-icon
+                  name="ellipse"
+                  [color]="provider.connected ? 'success' : 'medium'"
+                  class="connection-dot"
+                ></ion-icon>
+                <strong>{{ provider.fullName }}</strong>
+                <ion-badge color="success" *ngIf="provider.connected">En línea</ion-badge>
+              </div>
+              <span class="provider-meta">{{ provider.email }}<ng-container *ngIf="provider.phone"> · {{ provider.phone }}</ng-container></span>
+              <span class="provider-meta">
+                Registro: {{ provider.createdAt | date:'dd/MM/yyyy HH:mm' }}
+                <ng-container *ngIf="provider.latitude != null">
+                  · GPS: {{ provider.latitude!.toFixed(3) }}, {{ provider.longitude!.toFixed(3) }}
+                </ng-container>
+              </span>
+              <div class="provider-categories">
+                <ion-chip *ngFor="let catId of provider.categories" color="primary" class="category-chip">
+                  {{ getCategoryName(catId) }}
+                </ion-chip>
+              </div>
+            </div>
+            <div class="provider-status">
+              <ion-badge [color]="provider.welcomeRequestSent ? 'primary' : 'medium'">
+                {{ provider.welcomeRequestSent ? 'Demo enviada' : 'Demo pendiente' }}
+              </ion-badge>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Demo requests -->
+      <ion-card class="section-card">
+        <ion-card-header>
+          <ion-card-title>Solicitudes de prueba</ion-card-title>
+          <ion-card-subtitle>Enviadas automáticamente al conectarse un proveedor nuevo. Se reinician al redesplegar el backend.</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <p class="empty-text" *ngIf="demoRequests.length === 0">No hay solicitudes de prueba en esta sesión del servidor.</p>
+
+          <div class="demo-row" *ngFor="let demo of demoRequests">
+            <div class="demo-main">
+              <strong>{{ demo.providerEmail }}</strong>
+              <span class="provider-meta">{{ demo.categoryName }} · {{ demo.createdAt | date:'dd/MM HH:mm' }}</span>
+            </div>
+            <ion-badge [color]="demoStatusColor(demo)">{{ demoStatusLabel(demo) }}</ion-badge>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </ng-container>
+  </div>
+</ion-content>

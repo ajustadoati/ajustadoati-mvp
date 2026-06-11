@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     is_provider BOOLEAN NOT NULL DEFAULT false,
     location JSONB,
     is_active BOOLEAN NOT NULL DEFAULT true,
+    welcome_request_sent BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     

@@ -25,6 +25,12 @@ spring:
       secret: ${JWT_SECRET:/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==}
       expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
+# App-specific configuration
+app:
+  admin:
+    # Comma-separated list of emails allowed to access /admin endpoints
+    emails: ${ADMIN_EMAILS:richardroj@gmail.com}
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==}

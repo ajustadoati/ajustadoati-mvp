@@ -28,8 +28,15 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
     Optional<Profile> findByUsernameOrEmailWithCategories(@Param("username") String username, @Param("email") String email);
 
     boolean existsByEmail(String email);
-    
+
     boolean existsByUsername(String username);
+
+    @Query("SELECT DISTINCT p FROM Profile p LEFT JOIN FETCH p.categories WHERE p.isProvider = true ORDER BY p.createdAt DESC")
+    List<Profile> findAllProvidersWithCategories();
+
+    long countByIsProviderTrue();
+
+    long countByIsProviderFalse();
     
     List<Profile> findByIsProviderTrueAndIsActiveTrue();
     

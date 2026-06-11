@@ -4,6 +4,7 @@ import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Profile;
 import com.ajustadoati.core.repository.ProfileRepository;
 import com.ajustadoati.core.security.JwtTokenProvider;
+import com.ajustadoati.core.service.GuestRequestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,9 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Handler principal para conexiones WebSocket
@@ -29,7 +33,11 @@ public class AjustadoAtiWebSocketHandler extends TextWebSocketHandler {
     private final WebSocketMessageService messageService;
     private final JwtTokenProvider jwtTokenProvider;
     private final ProfileRepository profileRepository;
+    private final GuestRequestService guestRequestService;
     private final ObjectMapper objectMapper;
+
+    // Delay para que la UI del proveedor termine de suscribirse antes de recibir las demos
+    private final ScheduledExecutorService demoScheduler = Executors.newSingleThreadScheduledExecutor();
     
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -114,6 +122,21 @@ public class AjustadoAtiWebSocketHandler extends TextWebSocketHandler {
             log.info("[WS-AUTH] {} | proveedor={} | categorias={} | session={}",
                     profile.getEmail(), profile.getIsProvider(),
                     categoriesCopy, session.getId().substring(0, 8));
+
+            // Primera conexión de un proveedor nuevo: enviar solicitudes de demostración
+            if (Boolean.TRUE.equals(profile.getIsProvider())
+                    && !Boolean.TRUE.equals(profile.getWelcomeRequestSent())) {
+                profile.setWelcomeRequestSent(true);
+                profileRepository.save(profile);
+                log.info("[DEMO] programando solicitudes de prueba para {}", profile.getEmail());
+                demoScheduler.schedule(() -> {
+                    try {
+                        guestRequestService.sendDemoRequestsToProvider(session, sessionInfo);
+                    } catch (Exception e) {
+                        log.error("[DEMO] error enviando solicitudes de prueba a {}", profile.getEmail(), e);
+                    }
+                }, 5, TimeUnit.SECONDS);
+            }
             
         } catch (Exception e) {
             log.error("Error establishing WebSocket connection for session: {}", session.getId(), e);

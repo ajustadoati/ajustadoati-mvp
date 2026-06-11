@@ -111,6 +111,12 @@ export const routes: Routes = [
       }
     ]
   },
+  // Backoffice (acceso restringido por email en el backend)
+  {
+    path: 'admin',
+    canActivate: [AuthGuard],
+    loadComponent: () => import('./pages/admin/admin.page').then(m => m.AdminPage)
+  },
   // Rutas directas para paginas que no estan en tabs
   {
     path: 'map',

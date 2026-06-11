@@ -59,6 +59,10 @@ public class Profile {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @Column(name = "welcome_request_sent")
+    @Builder.Default
+    private Boolean welcomeRequestSent = false;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreatedDate

@@ -1,35 +1,67 @@
 import { Injectable } from '@angular/core';
-import { CategoryService } from './category.service';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
+
+export interface AdminProvider {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  categories: number[];
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  createdAt: string;
+  isActive: boolean;
+  welcomeRequestSent: boolean;
+  connected: boolean;
+}
+
+export interface AdminStats {
+  totalProviders: number;
+  totalUsers: number;
+  connectedProviders: number;
+  connectedUsers: number;
+  demoRequestsSent: number;
+  demoRequestsResponded: number;
+}
+
+export interface DemoRequestSummary {
+  requestId: string;
+  providerEmail: string;
+  categoryName: string;
+  message: string;
+  status: string;
+  responsesCount: number;
+  createdAt: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AdminService {
 
-  constructor(private categoryService: CategoryService) {}
+  constructor(private http: HttpClient) {}
 
-  // Métodos deshabilitados - las categorías se obtienen directamente del backend
-  // /**
-  //  * Método para inicializar todas las categorías en el backend
-  //  * Ejecutar una sola vez al configurar la aplicación
-  //  */
-  // async initializeCategories(): Promise<void> {
-  //   try {
-  //     console.log('Iniciando carga de categorías...');
-  //     await this.categoryService.createAllCategories();
-  //     console.log('✅ Categorías cargadas exitosamente en el backend');
-  //   } catch (error) {
-  //     console.error('❌ Error cargando categorías:', error);
-  //     throw error;
-  //   }
-  // }
+  async getStats(): Promise<AdminStats> {
+    const response = await firstValueFrom(
+      this.http.get<any>(`${environment.baseUrl}/admin/stats`)
+    );
+    return response.data;
+  }
 
-  // /**
-  //  * Método de utilidad para desarrolladores
-  //  * Puede llamarse desde la consola del navegador
-  //  */
-  // async runCategorySetup(): Promise<void> {
-  //   console.log('🔄 Configurando categorías de Google Maps...');
-  //   await this.initializeCategories();
-  // }
+  async getProviders(): Promise<AdminProvider[]> {
+    const response = await firstValueFrom(
+      this.http.get<any>(`${environment.baseUrl}/admin/providers`)
+    );
+    return response.data || [];
+  }
+
+  async getDemoRequests(): Promise<DemoRequestSummary[]> {
+    const response = await firstValueFrom(
+      this.http.get<any>(`${environment.baseUrl}/admin/demo-requests`)
+    );
+    return response.data || [];
+  }
 }

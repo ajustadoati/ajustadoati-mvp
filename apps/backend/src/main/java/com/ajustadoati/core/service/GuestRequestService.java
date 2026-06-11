@@ -177,6 +177,89 @@ public class GuestRequestService {
         }
     }
 
+    /**
+     * Envía hasta dos solicitudes de demostración a un proveedor recién registrado,
+     * usando sus propias categorías y coordenadas desplazadas ~3km y ~5km de su ubicación.
+     * Las solicitudes solo se entregan a la sesión WS de ese proveedor — nunca a otros.
+     */
+    public void sendDemoRequestsToProvider(WebSocketSession providerSession, WebSocketDto.SessionInfo providerInfo) {
+        if (providerInfo.getLocation() == null
+                || providerInfo.getLocation().getLatitude() == null
+                || providerInfo.getLocation().getLongitude() == null) {
+            log.warn("[DEMO] {} sin ubicacion en perfil — no se envian solicitudes de prueba", providerInfo.getEmail());
+            return;
+        }
+
+        List<Integer> categories = providerInfo.getCategories();
+        if (categories == null || categories.isEmpty()) {
+            log.warn("[DEMO] {} sin categorias — no se envian solicitudes de prueba", providerInfo.getEmail());
+            return;
+        }
+
+        double baseLat = providerInfo.getLocation().getLatitude().doubleValue();
+        double baseLng = providerInfo.getLocation().getLongitude().doubleValue();
+
+        // ~3km al norte y ~5km al este (1 grado lat ≈ 111km)
+        double[][] offsets = {
+                { 3.0 / 111.0, 0.0 },
+                { 0.0, 5.0 / (111.0 * Math.cos(Math.toRadians(baseLat))) }
+        };
+
+        int count = Math.min(2, categories.size());
+        for (int i = 0; i < count; i++) {
+            Integer categoryId = categories.get(i);
+            String categoryName = resolveCategoryName(categoryId, null);
+            double lat = baseLat + offsets[i][0];
+            double lng = baseLng + offsets[i][1];
+            double distanceKm = i == 0 ? 3.0 : 5.0;
+
+            UUID requestId = UUID.randomUUID();
+            LocalDateTime now = LocalDateTime.now();
+            String demoRef = "demo+" + requestId.toString().substring(0, 8) + "@ajustadoati.local";
+            String message = String.format(
+                    "[PRUEBA] Un cliente a %.0f km necesita: %s. Esta es una solicitud de demostración de AjustadoATi — respóndela para ver cómo funciona la plataforma.",
+                    distanceKm, categoryName);
+
+            GuestRequestSession session = new GuestRequestSession(
+                    requestId, demoRef, categoryId, categoryName, message,
+                    lat, lng, 50.0, "pending", 1, now, now, new ArrayList<>());
+            session.demo = true;
+            session.demoProviderEmail = providerInfo.getEmail();
+            sessions.put(requestId, session);
+
+            WebSocketDto.OutgoingMessage wsMessage = WebSocketDto.OutgoingMessage.builder()
+                    .id(System.currentTimeMillis() + i)
+                    .type("request")
+                    .fromUser(demoRef)
+                    .user(demoRef)
+                    .message(message)
+                    .latitude(BigDecimal.valueOf(lat))
+                    .longitude(BigDecimal.valueOf(lng))
+                    .categoryId(categoryId)
+                    .categoryName(categoryName)
+                    .requestId(requestId)
+                    .timestamp(now)
+                    .build();
+
+            if (sendMessageToSession(providerSession, wsMessage)) {
+                log.info("[DEMO] solicitud de prueba {} ({}, {} km) enviada a {}",
+                        requestId, categoryName, Math.round(distanceKm), providerInfo.getEmail());
+            } else {
+                log.warn("[DEMO] fallo el envio de la solicitud de prueba {} a {}", requestId, providerInfo.getEmail());
+            }
+        }
+    }
+
+    public List<com.ajustadoati.core.dto.AdminDto.DemoRequestSummary> getDemoRequests() {
+        return sessions.values().stream()
+                .filter(s -> s.demo)
+                .sorted((a, b) -> b.createdAt.compareTo(a.createdAt))
+                .map(s -> new com.ajustadoati.core.dto.AdminDto.DemoRequestSummary(
+                        s.id, s.demoProviderEmail, s.categoryName, s.message,
+                        s.status, s.responses.size(), s.createdAt))
+                .toList();
+    }
+
     private int notifyProviders(GuestRequestSession session) {
         log.info("[PETICION] id={} | categoria={} ({}) | lat={} lon={} | radio={}km",
                 session.id, session.categoryId, session.categoryName,
@@ -285,6 +368,8 @@ public class GuestRequestService {
         private final LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private final List<GuestRequestResponseDto> responses;
+        private boolean demo = false;
+        private String demoProviderEmail;
 
         private GuestRequestSession(
                 UUID id,
