@@ -34,6 +34,16 @@ Cuando un proveedor con `welcome_request_sent = false` se conecta por WebSocket:
 Las solicitudes demo viven en memoria: se pierden al reiniciar el backend
 (el flag en BD evita que se reenvíen).
 
+## 2.1 Caducidad de solicitudes
+
+- Una solicitud activa (`pending` o `responded`) caduca a los **15 minutos**
+  (configurable con `REQUEST_EXPIRATION_MINUTES`).
+- Al caducar: se emite `request_expired` por WebSocket y los proveedores la
+  eliminan de su lista; el backend rechaza respuestas tardías con un mensaje claro.
+- El frontend del proveedor también filtra por edad las solicitudes guardadas
+  en localStorage (cubre proveedores que estaban desconectados al caducar).
+- Las caducadas **no se borran**: quedan visibles en el backoffice con estado "Caducada".
+
 ## 3. Backoffice (`/admin`)
 
 - URL: `https://ajustadoati.com/admin` (requiere login).

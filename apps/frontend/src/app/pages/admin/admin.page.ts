@@ -14,7 +14,7 @@ import {
   refreshOutline,
   wifiOutline
 } from 'ionicons/icons';
-import { AdminService, AdminProvider, AdminStats, DemoRequestSummary } from '../../services/admin.service';
+import { AdminService, AdminProvider, AdminStats, GuestRequestSummary } from '../../services/admin.service';
 import { CategoryService } from '../../services/category.service';
 import { Category } from '../../interfaces/category';
 import { firstValueFrom } from 'rxjs';
@@ -29,7 +29,7 @@ import { firstValueFrom } from 'rxjs';
 export class AdminPage implements OnInit {
   stats: AdminStats | null = null;
   providers: AdminProvider[] = [];
-  demoRequests: DemoRequestSummary[] = [];
+  guestRequests: GuestRequestSummary[] = [];
   categories: Category[] = [];
   isLoading = false;
   isForbidden = false;
@@ -68,14 +68,14 @@ export class AdminPage implements OnInit {
     this.errorMessage = '';
 
     try {
-      const [stats, providers, demos] = await Promise.all([
+      const [stats, providers, requests] = await Promise.all([
         this.adminService.getStats(),
         this.adminService.getProviders(),
-        this.adminService.getDemoRequests()
+        this.adminService.getGuestRequests()
       ]);
       this.stats = stats;
       this.providers = providers;
-      this.demoRequests = demos;
+      this.guestRequests = requests;
     } catch (error: any) {
       if (error?.status === 403) {
         this.isForbidden = true;
@@ -93,16 +93,22 @@ export class AdminPage implements OnInit {
     return this.categories.find(c => c.id === categoryId)?.name || `Cat. ${categoryId}`;
   }
 
-  demoStatusLabel(demo: DemoRequestSummary): string {
-    if (demo.status === 'accepted') return 'Aceptada';
-    if (demo.responsesCount > 0) return 'Respondida';
-    return 'Sin respuesta';
+  requestStatusLabel(request: GuestRequestSummary): string {
+    switch (request.status) {
+      case 'accepted': return 'Aceptada';
+      case 'expired': return 'Caducada';
+      case 'responded': return 'Respondida';
+      default: return 'Pendiente';
+    }
   }
 
-  demoStatusColor(demo: DemoRequestSummary): string {
-    if (demo.status === 'accepted') return 'success';
-    if (demo.responsesCount > 0) return 'primary';
-    return 'medium';
+  requestStatusColor(request: GuestRequestSummary): string {
+    switch (request.status) {
+      case 'accepted': return 'success';
+      case 'expired': return 'danger';
+      case 'responded': return 'primary';
+      default: return 'medium';
+    }
   }
 
   goBack() {

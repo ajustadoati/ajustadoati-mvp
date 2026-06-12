@@ -10,6 +10,8 @@ import com.ajustadoati.core.websocket.ConnectionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -33,6 +35,53 @@ public class GuestRequestService {
     private final ObjectMapper objectMapper;
 
     private final Map<UUID, GuestRequestSession> sessions = new ConcurrentHashMap<>();
+
+    @Value("${app.requests.expiration-minutes:15}")
+    private long expirationMinutes;
+
+    /**
+     * Marca como caducadas las solicitudes activas más viejas que el TTL y avisa
+     * a los proveedores conectados para que las quiten de su lista.
+     * Las solicitudes caducadas siguen visibles en el backoffice.
+     */
+    @Scheduled(fixedRate = 60000)
+    public void expireOldRequests() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(expirationMinutes);
+
+        for (GuestRequestSession session : sessions.values()) {
+            boolean expirable = "pending".equals(session.status) || "responded".equals(session.status);
+            if (!expirable || session.createdAt.isAfter(cutoff)) {
+                continue;
+            }
+
+            synchronized (session) {
+                session.status = "expired";
+                session.updatedAt = LocalDateTime.now();
+            }
+
+            WebSocketDto.OutgoingMessage expiredMessage = WebSocketDto.OutgoingMessage.builder()
+                    .type("request_expired")
+                    .message("La solicitud ha caducado")
+                    .requestId(session.id)
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            int notified = 0;
+            for (WebSocketSession providerSession : connectionRegistry.getAllProviderSessions()) {
+                if (sendMessageToSession(providerSession, expiredMessage)) {
+                    notified++;
+                }
+            }
+
+            log.info("[CADUCADA] peticion={} ({}) | creada {} | proveedores avisados={}",
+                    session.id, session.categoryName, session.createdAt, notified);
+        }
+    }
+
+    public boolean isRequestExpired(UUID requestId) {
+        GuestRequestSession session = sessions.get(requestId);
+        return session != null && "expired".equals(session.status);
+    }
 
     public GuestRequestDto createRequest(GuestRequestCreateRequest request) {
         UUID requestId = UUID.randomUUID();
@@ -248,6 +297,15 @@ public class GuestRequestService {
                 log.warn("[DEMO] fallo el envio de la solicitud de prueba {} a {}", requestId, providerInfo.getEmail());
             }
         }
+    }
+
+    public List<com.ajustadoati.core.dto.AdminDto.GuestRequestSummary> getAllRequests() {
+        return sessions.values().stream()
+                .sorted((a, b) -> b.createdAt.compareTo(a.createdAt))
+                .map(s -> new com.ajustadoati.core.dto.AdminDto.GuestRequestSummary(
+                        s.id, s.guestRef, s.demoProviderEmail, s.categoryName, s.message,
+                        s.status, s.responses.size(), s.demo, s.createdAt))
+                .toList();
     }
 
     public List<com.ajustadoati.core.dto.AdminDto.DemoRequestSummary> getDemoRequests() {

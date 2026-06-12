@@ -155,6 +155,10 @@ export class ProviderHomePage implements OnInit, OnDestroy {
               await this.showToast('Un cliente aceptó tu oferta. Revisa el trabajo activo para coordinar.', 'success');
             }
           }
+
+          if (notification.type === 'request_expired' && notification.requestId) {
+            this.providerWorkspace.removeExpiredRequest(notification.requestId);
+          }
         });
 
       this.subscriptions.push(connectionSub, authSub, notificationsSub);

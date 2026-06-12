@@ -3,6 +3,7 @@ package com.ajustadoati.core.controller;
 import com.ajustadoati.core.dto.AdminDto.AdminProviderDto;
 import com.ajustadoati.core.dto.AdminDto.AdminStatsDto;
 import com.ajustadoati.core.dto.AdminDto.DemoRequestSummary;
+import com.ajustadoati.core.dto.AdminDto.GuestRequestSummary;
 import com.ajustadoati.core.dto.CommonDto.ApiResponse;
 import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Profile;
@@ -83,12 +84,12 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
 
-    @GetMapping("/demo-requests")
-    public ResponseEntity<ApiResponse<List<DemoRequestSummary>>> getDemoRequests(Authentication authentication) {
-        ResponseEntity<ApiResponse<List<DemoRequestSummary>>> forbidden = checkAdmin(authentication);
+    @GetMapping("/guest-requests")
+    public ResponseEntity<ApiResponse<List<GuestRequestSummary>>> getGuestRequests(Authentication authentication) {
+        ResponseEntity<ApiResponse<List<GuestRequestSummary>>> forbidden = checkAdmin(authentication);
         if (forbidden != null) return forbidden;
 
-        return ResponseEntity.ok(ApiResponse.success(guestRequestService.getDemoRequests()));
+        return ResponseEntity.ok(ApiResponse.success(guestRequestService.getAllRequests()));
     }
 
     /**

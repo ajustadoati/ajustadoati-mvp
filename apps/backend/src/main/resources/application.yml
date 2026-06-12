@@ -30,6 +30,9 @@ app:
   admin:
     # Comma-separated list of emails allowed to access /admin endpoints
     emails: ${ADMIN_EMAILS:richardroj@gmail.com}
+  requests:
+    # Minutes before an active request expires and stops being visible to providers
+    expiration-minutes: ${REQUEST_EXPIRATION_MINUTES:15}
 
 # JWT Configuration
 jwt:

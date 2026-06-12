@@ -27,13 +27,15 @@ export interface AdminStats {
   demoRequestsResponded: number;
 }
 
-export interface DemoRequestSummary {
+export interface GuestRequestSummary {
   requestId: string;
-  providerEmail: string;
+  guestRef: string;
+  providerEmail?: string;
   categoryName: string;
   message: string;
   status: string;
   responsesCount: number;
+  demo: boolean;
   createdAt: string;
 }
 
@@ -58,9 +60,9 @@ export class AdminService {
     return response.data || [];
   }
 
-  async getDemoRequests(): Promise<DemoRequestSummary[]> {
+  async getGuestRequests(): Promise<GuestRequestSummary[]> {
     const response = await firstValueFrom(
-      this.http.get<any>(`${environment.baseUrl}/admin/demo-requests`)
+      this.http.get<any>(`${environment.baseUrl}/admin/guest-requests`)
     );
     return response.data || [];
   }

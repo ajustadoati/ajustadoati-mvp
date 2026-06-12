@@ -39,4 +39,16 @@ public class AdminDto {
         int responsesCount,
         LocalDateTime createdAt
     ) {}
+
+    public record GuestRequestSummary(
+        UUID requestId,
+        String guestRef,
+        String providerEmail,
+        String categoryName,
+        String message,
+        String status,
+        int responsesCount,
+        boolean demo,
+        LocalDateTime createdAt
+    ) {}
 }

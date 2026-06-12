@@ -97,21 +97,29 @@
         </ion-card-content>
       </ion-card>
 
-      <!-- Demo requests -->
+      <!-- Guest requests -->
       <ion-card class="section-card">
         <ion-card-header>
-          <ion-card-title>Solicitudes de prueba</ion-card-title>
-          <ion-card-subtitle>Enviadas automáticamente al conectarse un proveedor nuevo. Se reinician al redesplegar el backend.</ion-card-subtitle>
+          <ion-card-title>Solicitudes de clientes</ion-card-title>
+          <ion-card-subtitle>Incluye las de prueba y las caducadas (caducan a los 15 min). Se reinician al redesplegar el backend.</ion-card-subtitle>
         </ion-card-header>
         <ion-card-content>
-          <p class="empty-text" *ngIf="demoRequests.length === 0">No hay solicitudes de prueba en esta sesión del servidor.</p>
+          <p class="empty-text" *ngIf="guestRequests.length === 0">No hay solicitudes en esta sesión del servidor.</p>
 
-          <div class="demo-row" *ngFor="let demo of demoRequests">
+          <div class="demo-row" *ngFor="let request of guestRequests">
             <div class="demo-main">
-              <strong>{{ demo.providerEmail }}</strong>
-              <span class="provider-meta">{{ demo.categoryName }} · {{ demo.createdAt | date:'dd/MM HH:mm' }}</span>
+              <div class="provider-name-line">
+                <strong>{{ request.categoryName }}</strong>
+                <ion-chip color="warning" class="category-chip" *ngIf="request.demo">Demo</ion-chip>
+              </div>
+              <span class="provider-meta">{{ request.message }}</span>
+              <span class="provider-meta">
+                {{ request.demo ? ('Para: ' + request.providerEmail) : request.guestRef }}
+                · {{ request.createdAt | date:'dd/MM HH:mm' }}
+                · {{ request.responsesCount }} respuesta(s)
+              </span>
             </div>
-            <ion-badge [color]="demoStatusColor(demo)">{{ demoStatusLabel(demo) }}</ion-badge>
+            <ion-badge [color]="requestStatusColor(request)">{{ requestStatusLabel(request) }}</ion-badge>
           </div>
         </ion-card-content>
       </ion-card>

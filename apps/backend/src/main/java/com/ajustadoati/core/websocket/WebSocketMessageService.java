@@ -153,7 +153,14 @@ public class WebSocketMessageService {
                 sendErrorMessage(session, "Request ID is required for responses");
                 return;
             }
-            
+
+            if (guestRequestService.isRequestExpired(message.getRequestId())) {
+                log.info("[RESPUESTA] {} → peticion={} RECHAZADA (caducada)",
+                        providerInfo.getEmail(), message.getRequestId());
+                sendErrorMessage(session, "La solicitud ya caducó y no admite respuestas");
+                return;
+            }
+
             // Obtener información del proveedor desde la base de datos (con categorías cargadas)
             Optional<Profile> providerProfileOpt = profileRepository.findByEmailWithCategories(providerInfo.getEmail());
             WebSocketDto.ProviderInfo providerInfoDto;

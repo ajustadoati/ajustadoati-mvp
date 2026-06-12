@@ -21,7 +21,7 @@ export interface OutgoingWebSocketMessage {
 // Mensajes salientes (servidor -> cliente)
 export interface IncomingWebSocketMessage {
   id?: number;
-  type: 'request' | 'response' | 'notification' | 'error' | 'pong' | 'authenticated' | 'offer_accepted' | 'job_started' | 'job_completed';
+  type: 'request' | 'response' | 'notification' | 'error' | 'pong' | 'authenticated' | 'offer_accepted' | 'job_started' | 'job_completed' | 'request_expired';
   fromUser?: string;
   user?: string; // Para compatibilidad
   message: string;
@@ -266,6 +266,10 @@ export class AjustadoAtiWebSocketService {
           break;
         case 'notification':
           this.handleNotification(message);
+          break;
+        case 'request_expired':
+          // Routed through notifications$ so provider pages can drop the request
+          this.notifications$.next(message);
           break;
         case 'error':
           this.handleError(message);

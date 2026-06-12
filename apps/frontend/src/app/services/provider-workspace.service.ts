@@ -27,6 +27,9 @@ const SENT_RESPONSES_KEY = 'provider_sent_responses';
 const ACTIVE_JOB_KEY = 'provider_active_job';
 const JOB_HISTORY_KEY = 'provider_job_history';
 
+// Must match the backend's app.requests.expiration-minutes (default 15)
+const REQUEST_TTL_MS = 15 * 60 * 1000;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -39,13 +42,44 @@ export class ProviderWorkspaceService {
   sentResponses$ = this.sentResponsesSubject.asObservable();
   activeJob$ = this.activeJobSubject.asObservable();
 
+  constructor() {
+    // Drop stale requests persisted in localStorage (provider may have been
+    // offline when the backend broadcast the expiration), then keep pruning.
+    this.pruneExpiredRequests();
+    setInterval(() => this.pruneExpiredRequests(), 60000);
+  }
+
   addIncomingRequest(request: ServiceRequest): void {
-    if (this.hasResponded(request) || this.hasPending(request)) {
+    if (this.hasResponded(request) || this.hasPending(request) || this.isExpiredByAge(request)) {
       return;
     }
 
     const pending = [request, ...this.pendingRequestsSubject.value].slice(0, 30);
     this.setPendingRequests(pending);
+  }
+
+  removeExpiredRequest(requestId: string): void {
+    const pending = this.pendingRequestsSubject.value.filter(
+      item => item.requestId !== requestId
+    );
+    if (pending.length !== this.pendingRequestsSubject.value.length) {
+      this.setPendingRequests(pending);
+    }
+  }
+
+  pruneExpiredRequests(): void {
+    const fresh = this.pendingRequestsSubject.value.filter(item => !this.isExpiredByAge(item));
+    if (fresh.length !== this.pendingRequestsSubject.value.length) {
+      this.setPendingRequests(fresh);
+    }
+  }
+
+  private isExpiredByAge(request: ServiceRequest): boolean {
+    if (!request.timestamp) {
+      return false;
+    }
+    const created = new Date(request.timestamp).getTime();
+    return !isNaN(created) && Date.now() - created > REQUEST_TTL_MS;
   }
 
   markResponded(
