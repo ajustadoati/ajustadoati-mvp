@@ -46,6 +46,18 @@ export class AdminService {
 
   constructor(private http: HttpClient) {}
 
+  /** True si el usuario autenticado está en ADMIN_EMAILS del backend. */
+  async checkAccess(): Promise<boolean> {
+    try {
+      const response = await firstValueFrom(
+        this.http.get<any>(`${environment.baseUrl}/admin/me`)
+      );
+      return response?.data === true;
+    } catch {
+      return false;
+    }
+  }
+
   async getStats(): Promise<AdminStats> {
     const response = await firstValueFrom(
       this.http.get<any>(`${environment.baseUrl}/admin/stats`)

@@ -4,6 +4,9 @@
       Panel de Proveedor
     </ion-title>
     <ion-buttons slot="end">
+      <ion-button *ngIf="isAdmin" (click)="goToAdmin()" title="Backoffice">
+        <ion-icon slot="icon-only" name="shield-checkmark-outline"></ion-icon>
+      </ion-button>
       <ion-button (click)="refreshLocation()">
         <ion-icon slot="icon-only" name="location-outline"></ion-icon>
       </ion-button>

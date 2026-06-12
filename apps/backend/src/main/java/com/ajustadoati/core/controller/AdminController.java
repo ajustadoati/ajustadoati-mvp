@@ -36,6 +36,14 @@ public class AdminController {
     @Value("${app.admin.emails:}")
     private List<String> adminEmails;
 
+    /** Comprobación ligera usada por el frontend para mostrar u ocultar el botón de admin. */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<Boolean>> checkAdminAccess(Authentication authentication) {
+        ResponseEntity<ApiResponse<Boolean>> forbidden = checkAdmin(authentication);
+        if (forbidden != null) return forbidden;
+        return ResponseEntity.ok(ApiResponse.success(true));
+    }
+
     @GetMapping("/providers")
     public ResponseEntity<ApiResponse<List<AdminProviderDto>>> getProviders(Authentication authentication) {
         ResponseEntity<ApiResponse<List<AdminProviderDto>>> forbidden = checkAdmin(authentication);

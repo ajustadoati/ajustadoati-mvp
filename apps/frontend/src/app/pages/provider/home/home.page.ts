@@ -15,6 +15,7 @@ import {
   ProviderSentResponse,
   ProviderWorkspaceService
 } from '../../../services/provider-workspace.service';
+import { AdminService } from '../../../services/admin.service';
 import { ProviderActiveJob } from '../../../interfaces/request.interface';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
@@ -35,6 +36,8 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   // Availability toggle
   isAvailable = true;
 
+  isAdmin = false;
+
   pendingRequests: ServiceRequest[] = [];
   sentResponses: ProviderSentResponse[] = [];
   activeJob: ProviderActiveJob | null = null;
@@ -49,7 +52,8 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     private auth: BackendAuthService,
     private websocket: AjustadoAtiWebSocketService,
     private geolocation: HybridGeolocationService,
-    private providerWorkspace: ProviderWorkspaceService
+    private providerWorkspace: ProviderWorkspaceService,
+    private adminService: AdminService
   ) {}
 
   async ngOnInit() {
@@ -71,6 +75,13 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
     // Request notification permissions
     await this.requestNotificationPermissions();
+
+    // Show admin button only for accounts listed in the backend's ADMIN_EMAILS
+    this.adminService.checkAccess().then(isAdmin => (this.isAdmin = isAdmin));
+  }
+
+  goToAdmin() {
+    this.router.navigate(['/admin']);
   }
 
   ngOnDestroy() {
