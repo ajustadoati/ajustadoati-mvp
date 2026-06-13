@@ -14,123 +14,103 @@
 </ion-header>
 
 <ion-content class="home-content">
-  <!-- Main Form Section -->
-  <div class="main-form-section">
-    <div class="welcome-header">
-      <h1>Hola {{ user?.fullName || 'Usuario' }}!</h1>
-      <p>Elige una categoria, describe lo que necesitas y avisamos a proveedores cercanos</p>
-    </div>
+  <div class="home-wrap">
+    <!-- Hero (compacto) -->
+    <header class="hero">
+      <h1>Hola, {{ user?.fullName || 'Usuario' }} 👋</h1>
+      <p>Cuéntanos qué necesitas y avisamos a proveedores cercanos.</p>
+    </header>
 
-    <ion-card class="service-form-card">
-      <ion-card-content>
-        <form [formGroup]="serviceForm" (ngSubmit)="onServiceSubmit()">
-          <!-- Category Selection -->
-          <div class="field-group">
-            <label class="field-label">Categoría del servicio</label>
-            <ion-select
-              formControlName="category"
-              interface="action-sheet"
-              [interfaceOptions]="{ header: 'Categoría del servicio' }"
-              placeholder="Selecciona una categoría"
-              [disabled]="loadingCategories || serviceCategories.length === 0"
-              class="category-select"
-              cancelText="Cancelar"
-              okText="Seleccionar"
-            >
-              <ion-select-option
-                *ngFor="let category of serviceCategories"
-                [value]="category.id"
-              >
-                {{ category.name }}
-              </ion-select-option>
-            </ion-select>
-            <div class="field-loading" *ngIf="loadingCategories">
-              <ion-spinner name="crescent"></ion-spinner>
-              <span>Cargando categorías…</span>
-            </div>
-          </div>
+    <!-- Active state cards -->
+    <a class="status-banner status-banner--search"
+       *ngIf="hasActiveSearch && !hasAcceptedOffer"
+       (click)="router.navigate(['/user/waiting-responses'])">
+      <ion-icon name="pulse-outline"></ion-icon>
+      <div class="status-text">
+        <strong>Búsqueda en progreso</strong>
+        <span>Toca para ver las respuestas</span>
+      </div>
+      <ion-icon name="chevron-forward-outline"></ion-icon>
+    </a>
 
-          <!-- Service Description -->
-          <div class="field-group">
-            <label class="field-label">¿Qué necesitas?</label>
-            <ion-textarea
-              formControlName="serviceDescription"
-              placeholder="Ej: reparar una lavadora que no centrifuga"
-              rows="3"
-              maxlength="180"
-              [counter]="true"
-              class="description-textarea"
-              autoGrow="true"
-            ></ion-textarea>
-          </div>
+    <a class="status-banner status-banner--active"
+       *ngIf="hasAcceptedOffer"
+       (click)="navigateToActiveRequest()">
+      <ion-icon name="car-outline"></ion-icon>
+      <div class="status-text">
+        <strong>Servicio en curso</strong>
+        <span>Tu proveedor está en camino</span>
+      </div>
+      <ion-icon name="chevron-forward-outline"></ion-icon>
+    </a>
 
-          <!-- Location Status -->
-          <div class="field-group">
-            <label class="field-label">Tu ubicación</label>
-            <div class="location-status" (click)="refreshLocation()">
-              <div class="location-icon-container">
-                <ion-icon
-                  [name]="isLocationLoading ? 'hourglass-outline' : 'location'"
-                  [color]="currentPosition ? 'success' : 'medium'"
-                ></ion-icon>
-              </div>
-              <div class="location-details">
-                <span class="location-text">{{ locationText }}</span>
-                <span class="location-hint" *ngIf="currentPosition">
-                  Los proveedores verán esta ubicación
-                </span>
-              </div>
-              <ion-icon name="refresh-outline" color="primary" class="refresh-icon"></ion-icon>
-            </div>
-          </div>
-
-          <!-- Submit Button -->
-          <ion-button
-            expand="block"
-            type="submit"
-            class="search-button"
-            [disabled]="serviceForm.invalid || isLoading || !currentPosition"
+    <!-- Form -->
+    <form class="form" [formGroup]="serviceForm" (ngSubmit)="onServiceSubmit()">
+      <!-- Categoría -->
+      <div class="field">
+        <label class="field-label">Categoría</label>
+        <ion-select
+          formControlName="category"
+          interface="action-sheet"
+          [interfaceOptions]="{ header: 'Categoría del servicio' }"
+          placeholder="Selecciona una categoría"
+          [disabled]="loadingCategories || serviceCategories.length === 0"
+          class="select-control"
+          cancelText="Cancelar"
+        >
+          <ion-select-option
+            *ngFor="let category of serviceCategories"
+            [value]="category.id"
           >
-            <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
-            <ion-icon name="search-outline" slot="start" *ngIf="!isLoading"></ion-icon>
-            <span *ngIf="!isLoading">Buscar Proveedores</span>
-            <span *ngIf="isLoading">Buscando...</span>
-          </ion-button>
-        </form>
-      </ion-card-content>
-    </ion-card>
-  </div>
-
-  <!-- Active Search Alert -->
-  <div class="active-search-section" *ngIf="hasActiveSearch && !hasAcceptedOffer">
-    <ion-card class="active-search-alert" (click)="router.navigate(['/user/waiting-responses'])">
-      <ion-card-content>
-        <div class="alert-content">
-          <ion-icon name="pulse-outline" color="success"></ion-icon>
-          <div class="alert-text">
-            <h3>Busqueda en Progreso</h3>
-            <p>Toca para ver las respuestas de proveedores</p>
-          </div>
-          <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
+            {{ category.name }}
+          </ion-select-option>
+        </ion-select>
+        <div class="field-loading" *ngIf="loadingCategories">
+          <ion-spinner name="crescent"></ion-spinner>
+          <span>Cargando categorías…</span>
         </div>
-      </ion-card-content>
-    </ion-card>
-  </div>
+      </div>
 
-  <!-- Active Request Alert (Offer Accepted) -->
-  <div class="active-search-section" *ngIf="hasAcceptedOffer">
-    <ion-card class="active-request-alert" (click)="navigateToActiveRequest()">
-      <ion-card-content>
-        <div class="alert-content">
-          <ion-icon name="car-outline" color="warning"></ion-icon>
-          <div class="alert-text">
-            <h3>Servicio en Curso</h3>
-            <p>Tu proveedor esta en camino</p>
-          </div>
-          <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
-        </div>
-      </ion-card-content>
-    </ion-card>
-  </div>
+      <!-- Descripción -->
+      <div class="field">
+        <label class="field-label">¿Qué necesitas?</label>
+        <ion-textarea
+          formControlName="serviceDescription"
+          placeholder="Ej: reparar una lavadora que no centrifuga"
+          rows="3"
+          maxlength="180"
+          [counter]="true"
+          autoGrow="true"
+          class="textarea-control"
+        ></ion-textarea>
+      </div>
 
+      <!-- Ubicación -->
+      <div class="field">
+        <label class="field-label">Tu ubicación</label>
+        <button type="button" class="location-row" (click)="refreshLocation()">
+          <ion-icon
+            [name]="isLocationLoading ? 'hourglass-outline' : 'location'"
+            [color]="currentPosition ? 'success' : 'medium'"
+            class="location-icon"
+          ></ion-icon>
+          <span class="location-text">{{ locationText }}</span>
+          <ion-icon name="refresh-outline" class="location-refresh"></ion-icon>
+        </button>
+      </div>
+
+      <!-- Submit -->
+      <ion-button
+        expand="block"
+        type="submit"
+        class="submit-button"
+        [disabled]="serviceForm.invalid || isLoading || !currentPosition"
+      >
+        <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
+        <ion-icon name="search-outline" slot="start" *ngIf="!isLoading"></ion-icon>
+        <span *ngIf="!isLoading">Buscar Proveedores</span>
+        <span *ngIf="isLoading">Buscando…</span>
+      </ion-button>
+    </form>
+  </div>
 </ion-content>
