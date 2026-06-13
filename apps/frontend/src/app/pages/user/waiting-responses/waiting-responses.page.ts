@@ -183,6 +183,7 @@ ${response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : 
         providerId: response.providerId,
         providerName: response.providerName,
         providerEmail: response.providerEmail,
+        providerPhone: response.providerPhone,
         message: response.message,
         estimatedTime: response.estimatedTime,
         price: response.price,
@@ -209,24 +210,26 @@ ${response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : 
   }
 
   async contactProvider(response: ProviderResponse) {
-    console.log('Contacting provider:', response);
+    // The response already carries the provider's phone from the backend's
+    // WebSocket payload (providerInfo.phone). Use it directly; fall back to
+    // matching against the session's provider list only if missing.
+    const phone =
+      response.providerPhone ||
+      this.currentSession?.providers.find(p => p.email === response.providerEmail)?.phone;
 
-    // Find complete provider info in session
-    const providerInfo = this.currentSession?.providers.find(p => p.email === response.providerEmail);
-    const phone = providerInfo?.phone || response.providerEmail;
-
-    if (phone && phone.match(/^[+]?[0-9\s\-\(\)]+$/)) {
-      // It's a phone number
-      const cleanPhone = phone.replace(/[^0-9+]/g, '');
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=Hola, vi tu respuesta sobre: ${response.message}`;
-      window.open(whatsappUrl, '_blank');
-    } else {
-      // It's an email
-      const subject = encodeURIComponent('Consulta sobre servicio');
-      const body = encodeURIComponent(`Hola ${response.providerName},\n\nVi tu respuesta: "${response.message}"\n\nPodrias darme mas informacion?\n\nGracias`);
-      const mailtoUrl = `mailto:${response.providerEmail}?subject=${subject}&body=${body}`;
-      window.open(mailtoUrl, '_blank');
+    const cleanPhone = phone ? phone.replace(/[^0-9+]/g, '') : '';
+    if (cleanPhone) {
+      const text = encodeURIComponent(`Hola ${response.providerName}, vi tu respuesta sobre: ${response.message}`);
+      window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+      return;
     }
+
+    // No usable phone — open email instead
+    const subject = encodeURIComponent('Consulta sobre servicio');
+    const body = encodeURIComponent(
+      `Hola ${response.providerName},\n\nVi tu respuesta: "${response.message}"\n\n¿Podrías darme más información?\n\nGracias`
+    );
+    window.open(`mailto:${response.providerEmail}?subject=${subject}&body=${body}`, '_blank');
   }
 
   viewOnMap() {

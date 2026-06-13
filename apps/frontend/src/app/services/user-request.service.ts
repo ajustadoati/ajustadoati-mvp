@@ -38,11 +38,12 @@ export class UserRequestService {
     categoryId: string;
     categoryName: string;
     description: string;
-    urgency: RequestUrgency;
+    urgency?: RequestUrgency;
     maxBudget?: number;
     location: { latitude: number; longitude: number; address?: string };
   }): Promise<UserServiceRequest> {
     const userId = this.auth.currentUser?.id || 'anonymous';
+    const urgency = data.urgency ?? RequestUrgency.NOW;
 
     const request: UserServiceRequest = {
       id: this.generateId(),
@@ -50,13 +51,13 @@ export class UserRequestService {
       categoryId: data.categoryId,
       categoryName: data.categoryName,
       description: data.description,
-      urgency: data.urgency,
+      urgency,
       maxBudget: data.maxBudget,
       location: data.location,
       status: RequestStatus.SEARCHING,
       createdAt: new Date(),
       updatedAt: new Date(),
-      expiresAt: this.calculateExpiration(data.urgency),
+      expiresAt: this.calculateExpiration(urgency),
       responses: []
     };
 

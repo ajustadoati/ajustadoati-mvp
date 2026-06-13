@@ -9,9 +9,6 @@
       <strong>👤 Mi Perfil</strong>
     </ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="navigateToSearch()" fill="clear">
-        <ion-icon name="search-outline"></ion-icon>
-      </ion-button>
       <ion-button (click)="navigateToRequests()" fill="clear">
         <ion-icon name="document-text-outline"></ion-icon>
       </ion-button>
@@ -78,36 +75,13 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Actions Card -->
-    <ion-card>
-      <ion-card-header>
-        <ion-card-title>
-          <ion-icon name="settings-outline"></ion-icon>
-          Acciones
-        </ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-button expand="block" fill="outline" (click)="editProfile()">
-          <ion-icon name="create-outline" slot="start"></ion-icon>
-          Editar Perfil
-        </ion-button>
-
-        <ion-button expand="block" fill="outline" (click)="viewHistory()">
-          <ion-icon name="time-outline" slot="start"></ion-icon>
-          Historial de Solicitudes
-        </ion-button>
-
-        <ion-button expand="block" fill="outline" (click)="viewSettings()">
-          <ion-icon name="settings-outline" slot="start"></ion-icon>
-          Configuración
-        </ion-button>
-
-        <ion-button expand="block" color="danger" (click)="logout()">
-          <ion-icon name="power" slot="start"></ion-icon>
-          Cerrar Sesión
-        </ion-button>
-      </ion-card-content>
-    </ion-card>
+    <!-- Logout -->
+    <div class="logout-section">
+      <ion-button expand="block" color="danger" (click)="logout()">
+        <ion-icon name="power" slot="start"></ion-icon>
+        Cerrar Sesión
+      </ion-button>
+    </div>
   </div>
 
   <!-- No Profile State -->

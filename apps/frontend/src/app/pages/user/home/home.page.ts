@@ -11,7 +11,6 @@ import { AjustadoAtiWebSocketService } from '../../../services/ajustadoati-webso
 import { SearchRequestService, SearchSession } from '../../../services/search-request.service';
 import { CategoryService, Category } from '../../../services/category.service';
 import { UserRequestService } from '../../../services/user-request.service';
-import { RequestUrgency } from '../../../interfaces/request.interface';
 
 @Component({
   selector: 'app-home',
@@ -32,13 +31,6 @@ export class HomePage implements OnInit, OnDestroy {
   serviceCategories: Category[] = [];
   loadingCategories = false;
 
-  // Urgency options
-  urgencyOptions = [
-    { value: 'now', label: 'Ahora', icon: 'flash-outline', color: 'danger' },
-    { value: 'today', label: 'Hoy', icon: 'today-outline', color: 'warning' },
-    { value: 'this_week', label: 'Esta semana', icon: 'calendar-outline', color: 'success' }
-  ];
-
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -58,9 +50,7 @@ export class HomePage implements OnInit, OnDestroy {
   ) {
     this.serviceForm = this.fb.group({
       category: ['', Validators.required],
-      serviceDescription: ['', [Validators.required, Validators.minLength(5)]],
-      urgency: ['now', Validators.required],
-      maxBudget: ['']
+      serviceDescription: ['', [Validators.required, Validators.minLength(5)]]
     });
   }
 
@@ -243,14 +233,12 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
 
-    const { category, serviceDescription, urgency, maxBudget } = this.serviceForm.value;
+    const { category, serviceDescription } = this.serviceForm.value;
 
-    await this.performServiceSearch(category.toString(), serviceDescription, urgency, maxBudget);
+    await this.performServiceSearch(category.toString(), serviceDescription);
   }
 
-
-
-  private async performServiceSearch(categoryId: string, description: string, urgency: string = 'now', maxBudget?: number) {
+  private async performServiceSearch(categoryId: string, description: string) {
     if (!this.currentPosition) {
       await this.showToast('Ubicación requerida para buscar proveedores', 'danger');
       return;
@@ -280,8 +268,6 @@ export class HomePage implements OnInit, OnDestroy {
         categoryId,
         categoryName,
         description,
-        urgency: urgency as RequestUrgency,
-        maxBudget: maxBudget ? parseFloat(maxBudget.toString()) : undefined,
         location: {
           latitude: this.currentPosition.latitude,
           longitude: this.currentPosition.longitude,
@@ -293,7 +279,7 @@ export class HomePage implements OnInit, OnDestroy {
         await this.showToast(`Búsqueda iniciada. ${session.providers.length} proveedores notificados.`, 'success');
 
         // Clear form and navigate to waiting-responses
-        this.serviceForm.reset({ urgency: 'now', serviceDescription: '', category: '', maxBudget: '' });
+        this.serviceForm.reset({ serviceDescription: '', category: '' });
         this.router.navigate(['/user/waiting-responses']);
       } else {
         await this.showNoProvidersAlert();
@@ -334,13 +320,6 @@ export class HomePage implements OnInit, OnDestroy {
           icon: 'person-outline',
           handler: () => {
             this.router.navigate(['/user/profile']);
-          }
-        },
-        {
-          text: 'Mis Solicitudes',
-          icon: 'document-text-outline',
-          handler: () => {
-            this.router.navigate(['/user/requests']);
           }
         },
         {

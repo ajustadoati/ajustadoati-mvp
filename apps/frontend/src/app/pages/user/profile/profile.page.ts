@@ -89,31 +89,8 @@ export class UserProfilePage implements OnInit {
     await toast.present();
   }
 
-  editProfile() {
-    console.log('✏️ Edit profile clicked');
-    this.showToast('Función de edición en desarrollo');
-    // TODO: Navigate to edit profile page or show modal
-    // this.router.navigate(['/edit-profile']);
-  }
-
-  viewHistory() {
-    console.log('🕰️ View history clicked');
-    this.router.navigate(['/user/requests']);
-  }
-
-  viewSettings() {
-    console.log('⚙️ View settings clicked');
-    this.showToast('Página de configuración en desarrollo');
-    // TODO: Create settings page
-    // this.router.navigate(['/settings']);
-  }
-
   goBack() {
     this.router.navigate(['/user/home']);
-  }
-
-  navigateToSearch() {
-    this.router.navigate(['/user/search']);
   }
 
   navigateToRequests() {
