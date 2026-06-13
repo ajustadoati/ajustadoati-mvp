@@ -78,8 +78,23 @@ export class ProviderWorkspaceService {
     if (!request.timestamp) {
       return false;
     }
-    const created = new Date(request.timestamp).getTime();
-    return !isNaN(created) && Date.now() - created > REQUEST_TTL_MS;
+    // Backend serializes LocalDateTime without a timezone designator. JavaScript
+    // would interpret that as local time and shift it by the browser's UTC
+    // offset — making fresh requests look hours old on a UTC backend with a
+    // non-UTC browser. Force UTC interpretation when no zone is present.
+    const hasZone = /[zZ]|[+\-]\d{2}:?\d{2}$/.test(request.timestamp);
+    const isoString = hasZone ? request.timestamp : request.timestamp + 'Z';
+    const created = new Date(isoString).getTime();
+    if (isNaN(created)) {
+      return false;
+    }
+    const age = Date.now() - created;
+    // Negative age = backend timestamp ahead of browser clock (local backend
+    // serialized local time, browser parsed it as UTC); not expired.
+    if (age < 0) {
+      return false;
+    }
+    return age > REQUEST_TTL_MS;
   }
 
   markResponded(
