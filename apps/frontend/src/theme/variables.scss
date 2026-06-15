@@ -1,7 +1,15 @@
 // AjustadoATi - Tema Personalizado
-// Colores modernos y atractivos
-
+// Colores modernos y atractivos.
+//
+// IMPORTANT: this app uses a single light palette. We explicitly opt out of
+// any prefers-color-scheme: dark mapping because every screen was designed
+// for light backgrounds — flipping --ion-color-dark to white on Android's
+// auto dark mode hides text on white cards (selects, stat cards, toggles)
+// and renders the app unusable. Keep `color-scheme: light` and do not add
+// a dark @media block.
 :root {
+  color-scheme: light;
+
   /** Colores Principales - Brand AjustadoATi **/
   --ion-color-primary: #2563EB;
   --ion-color-primary-rgb: 37, 99, 235;
@@ -120,38 +128,4 @@
   --font-size-4xl: 36px;
 }
 
-/** Modo Oscuro **/
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ion-color-primary: #60A5FA;
-    --ion-color-primary-rgb: 96, 165, 250;
-    --ion-color-primary-shade: #5495E8;
-    --ion-color-primary-tint: #70B0FB;
-
-    --ion-color-secondary: #34D399;
-    --ion-color-secondary-rgb: 52, 211, 153;
-    --ion-color-secondary-shade: #2EC287;
-    --ion-color-secondary-tint: #48D8A3;
-
-    --ion-color-dark: #F9FAFB;
-    --ion-color-dark-rgb: 249, 250, 251;
-    --ion-color-dark-contrast: #000000;
-    --ion-color-dark-contrast-rgb: 0, 0, 0;
-    --ion-color-dark-shade: #DBDCDD;
-    --ion-color-dark-tint: #FAFBFC;
-
-    --ion-color-medium: #9CA3AF;
-    --ion-color-medium-rgb: 156, 163, 175;
-    --ion-color-medium-contrast: #000000;
-    --ion-color-medium-contrast-rgb: 0, 0, 0;
-    --ion-color-medium-shade: #89909A;
-    --ion-color-medium-tint: #A6ACB7;
-
-    --ion-color-light: #374151;
-    --ion-color-light-rgb: 55, 65, 81;
-    --ion-color-light-contrast: #ffffff;
-    --ion-color-light-contrast-rgb: 255, 255, 255;
-    --ion-color-light-shade: #313947;
-    --ion-color-light-tint: #4B5563;
-  }
-}
+// NOTE: dark-mode @media block intentionally removed. See header comment.
