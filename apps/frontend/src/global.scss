@@ -28,13 +28,18 @@
 /**
  * Ionic Dark Mode
  * -----------------------------------------------------
- * For more info, please see:
- * https://ionicframework.com/docs/theming/dark-mode
+ * IMPORTANT: do NOT re-enable any of these imports until a real dark
+ * theme exists. dark.system.css automatically flips every Ionic surface
+ * (popover backgrounds, ion-item, ion-input, ion-select-popover…) when
+ * the OS reports prefers-color-scheme: dark, leaving black-on-black
+ * placeholders, invisible labels and empty-looking select dropdowns —
+ * the exact bug Android/Brave users reported.
+ *
+ * The app uses a single light palette only.
  */
-
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
-@import '@ionic/angular/css/palettes/dark.system.css';
+/* @import '@ionic/angular/css/palettes/dark.system.css'; */
 
 // Fuente personalizada (opcional - requeriría importar Google Fonts)
 // @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -561,4 +566,111 @@ ion-button[fill="clear"] {
     color: white !important;
     opacity: 1 !important;
   }
+}
+
+// =====================================================================
+// FORCE LIGHT MODE (Chromium "Force Dark for Web Content" defense)
+// =====================================================================
+// Brave / Chrome with the Force Dark flag (auto-on when OS is dark in
+// recent Brave) inverts any surface that does not have an explicit
+// background-color. The Ionic web components — ion-popover content,
+// ion-select-popover items, ion-input/ion-textarea native shadow root,
+// ion-modal content — render with --background: transparent by default,
+// which is exactly what Force Dark targets. That left the select
+// dropdown looking like empty black boxes and the register form labels
+// invisible on user reports.
+//
+// Two-pronged defence:
+//   1. Explicit white --background everywhere a form control sits, so
+//      Force Dark sees a real color and skips inversion.
+//   2. `forced-color-adjust: none` on the popover/menu surfaces, which
+//      tells Chromium "trust my colors, don't repaint".
+// Combined with the global `color-scheme: light` already in
+// variables.scss this fully neutralises both system dark-mode and
+// per-browser "force dark" features.
+
+ion-popover {
+  --background: #ffffff;
+  --color: #0f172a;
+  forced-color-adjust: none;
+
+  &::part(content),
+  &::part(backdrop) {
+    --background: #ffffff;
+  }
+}
+
+ion-select-popover {
+  background: #ffffff;
+  color: #0f172a;
+  forced-color-adjust: none;
+
+  ion-list {
+    background: #ffffff;
+  }
+
+  ion-item {
+    --background: #ffffff;
+    --background-hover: #f1f5f9;
+    --color: #0f172a;
+    --color-hover: #0f172a;
+    color: #0f172a;
+  }
+
+  ion-radio,
+  ion-checkbox {
+    --color: #94a3b8;
+    --color-checked: var(--ion-color-primary);
+  }
+}
+
+// Action sheet (the interface="action-sheet" we use on Android selects)
+ion-action-sheet {
+  --background: #ffffff;
+  --color: #0f172a;
+  --button-color: #0f172a;
+  --button-background-selected: #f1f5f9;
+  forced-color-adjust: none;
+}
+
+// Alerts (login errors, accept-offer confirmations…)
+ion-alert {
+  --background: #ffffff;
+  --color: #0f172a;
+  forced-color-adjust: none;
+
+  .alert-title,
+  .alert-message,
+  .alert-button-inner {
+    color: #0f172a !important;
+  }
+}
+
+// Modal containers (guest search modal in particular)
+ion-modal {
+  --background: #ffffff;
+}
+
+// Native form controls inside Ionic — these were rendering invisibly on
+// Brave because the placeholder/border colors got inverted but the
+// background stayed white.
+ion-input,
+ion-textarea,
+ion-select {
+  --background: #ffffff;
+  --color: #0f172a;
+  --placeholder-color: #94a3b8;
+  --placeholder-opacity: 1;
+}
+
+// ion-label inside form items — register page had several invisible
+// labels on Brave because Force Dark turned their default medium-grey
+// color into near-white over a near-white background.
+ion-item ion-label {
+  color: #0f172a !important;
+}
+
+ion-item ion-label[position="floating"],
+ion-item ion-label[position="stacked"] {
+  color: #475569 !important;
 }
