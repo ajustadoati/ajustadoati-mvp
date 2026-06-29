@@ -9,22 +9,13 @@
           class="brand-logo"
         />
       </div>
-      <h1 class="app-title">Crear Cuenta</h1>
-      <p class="app-subtitle">Unete a AjustadoATi</p>
+      <h1 class="app-title">Crear cuenta de proveedor</h1>
+      <p class="app-subtitle">Recibe solicitudes de clientes cercanos en tu zona y categoría.</p>
     </div>
 
     <!-- Register Form -->
     <div class="form-section">
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-        <!-- User Type Selection -->
-        <ion-item fill="outline" class="form-item">
-          <ion-icon name="people-outline" slot="start"></ion-icon>
-          <ion-select formControlName="userType" (ionChange)="onUserTypeChange($event)" label="Tipo de Cuenta" labelPlacement="floating">
-            <ion-select-option value="user">Usuario (Busco servicios)</ion-select-option>
-            <ion-select-option value="provider">Proveedor (Ofrezco servicios)</ion-select-option>
-          </ion-select>
-        </ion-item>
-
         <!-- Email Input -->
         <ion-item fill="outline" class="form-item">
           <ion-icon name="mail-outline" slot="start"></ion-icon>
@@ -99,70 +90,35 @@
           El teléfono es requerido
         </div>
 
-        <!-- Provider Specific Fields -->
-        <div *ngIf="userType === 'provider'" class="provider-fields">
-          <!-- Business Name -->
-          <ion-item fill="outline" class="form-item">
-            <ion-icon name="business-outline" slot="start"></ion-icon>
-            <ion-input
-              type="text"
-              formControlName="businessName"
-              placeholder="Nombre de tu empresa"
-              label="Nombre del Negocio"
-              labelPlacement="floating"
-            ></ion-input>
-          </ion-item>
-          <div class="error-message" *ngIf="businessName?.errors?.['required'] && businessName?.touched">
-            El nombre del negocio es requerido
+        <!-- Categories Selection -->
+        <div class="categories-section">
+          <div class="categories-header">
+            <h3>Categorías de Servicio</h3>
+            <p>Selecciona las categorías en las que ofreces servicios</p>
           </div>
 
-          <!-- Categories Selection -->
-          <div class="categories-section">
-            <div class="categories-header">
-              <h3>Categorías de Servicio</h3>
-              <p>Selecciona las categorías en las que ofreces servicios</p>
-            </div>
+          <div *ngIf="loadingCategories" class="loading-categories">
+            <ion-spinner name="crescent" color="primary"></ion-spinner>
+            <p>Cargando categorías...</p>
+          </div>
 
-            <!-- Loading State -->
-            <div *ngIf="loadingCategories" class="loading-categories">
-              <ion-spinner name="crescent" color="primary"></ion-spinner>
-              <p>Cargando categorías...</p>
-            </div>
-
-            <!-- Categories Grid -->
-            <div *ngIf="!loadingCategories" class="categories-grid">
-              <div
-                *ngFor="let category of availableCategories"
-                class="category-card"
-                [class.selected]="isCategorySelected(category.id)"
-                (click)="toggleCategory(category.id)"
-              >
-                <ion-icon
-                  [name]="isCategorySelected(category.id) ? 'checkmark-circle' : 'add-circle-outline'"
-                  [color]="isCategorySelected(category.id) ? 'success' : 'medium'"
-                ></ion-icon>
-                <span>{{ category.name }}</span>
-              </div>
-            </div>
-
-            <div class="error-message" *ngIf="categories?.invalid && categories?.touched">
-              Selecciona al menos una categoría
+          <div *ngIf="!loadingCategories" class="categories-grid">
+            <div
+              *ngFor="let category of availableCategories"
+              class="category-card"
+              [class.selected]="isCategorySelected(category.id)"
+              (click)="toggleCategory(category.id)"
+            >
+              <ion-icon
+                [name]="isCategorySelected(category.id) ? 'checkmark-circle' : 'add-circle-outline'"
+                [color]="isCategorySelected(category.id) ? 'success' : 'medium'"
+              ></ion-icon>
+              <span>{{ category.name }}</span>
             </div>
           </div>
 
-          <!-- Description -->
-          <ion-item fill="outline" class="form-item">
-            <ion-icon name="document-text-outline" slot="start"></ion-icon>
-            <ion-textarea
-              formControlName="description"
-              rows="3"
-              placeholder="Describe los servicios que ofreces..."
-              label="Descripción"
-              labelPlacement="floating"
-            ></ion-textarea>
-          </ion-item>
-          <div class="error-message" *ngIf="description?.errors?.['required'] && description?.touched">
-            La descripción es requerida
+          <div class="error-message" *ngIf="categories?.invalid && categories?.touched">
+            Selecciona al menos una categoría
           </div>
         </div>
 

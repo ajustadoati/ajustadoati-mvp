@@ -22,6 +22,16 @@
   <!-- add to homescreen for ios -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+  <!-- Plausible Analytics (cookieless, GDPR-friendly).
+       The defensive queue lets us call window.plausible() before the script
+       has loaded; it gets flushed once script.js arrives. -->
+  <script defer data-domain="ajustadoati.com" src="https://plausible.io/js/script.js"></script>
+  <script>
+    window.plausible = window.plausible || function () {
+      (window.plausible.q = window.plausible.q || []).push(arguments);
+    };
+  </script>
 </head>
 
 <body>

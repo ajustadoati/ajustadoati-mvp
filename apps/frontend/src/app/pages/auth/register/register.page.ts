@@ -20,7 +20,6 @@ import { firstValueFrom } from 'rxjs';
 export class RegisterPage implements OnInit {
   registerForm: FormGroup;
   isLoading = false;
-  userType: 'user' | 'provider' = 'user';
   availableCategories: Category[] = [];
   selectedCategories: number[] = [];
   loadingCategories = false;
@@ -35,16 +34,14 @@ export class RegisterPage implements OnInit {
     private toastCtrl: ToastController,
     private alertCtrl: AlertController
   ) {
+    // Provider-only registration. Customers use the public search flow
+    // (no account required); only professionals need to create an account.
     this.registerForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
       phone: ['', [Validators.required, Validators.pattern(/^\+?[\d\s\-\(\)]+$/)]],
-      userType: ['user', [Validators.required]],
-      // Provider specific fields
-      businessName: [''],
-      categories: [[]],
-      description: [''],
+      categories: [[], [Validators.required, this.minArrayLength(1)]],
       acceptTerms: [false, [Validators.requiredTrue]]
     }, { validators: this.passwordMatchValidator });
   }
@@ -52,37 +49,6 @@ export class RegisterPage implements OnInit {
   async ngOnInit() {
     console.log('📝 Register page initialized');
     await this.loadCategories();
-  }
-
-  onUserTypeChange(event: any) {
-    this.userType = event.detail.value;
-    this.updateProviderValidators();
-    
-    // Reset selected categories when switching user types
-    if (this.userType !== 'provider') {
-      this.selectedCategories = [];
-      this.registerForm.patchValue({ categories: [] });
-    }
-  }
-
-  private updateProviderValidators() {
-    const businessNameControl = this.registerForm.get('businessName');
-    const categoriesControl = this.registerForm.get('categories');
-    const descriptionControl = this.registerForm.get('description');
-
-    if (this.userType === 'provider') {
-      businessNameControl?.setValidators([Validators.required, Validators.minLength(2)]);
-      categoriesControl?.setValidators([Validators.required, this.minArrayLength(1)]);
-      descriptionControl?.setValidators([Validators.required, Validators.minLength(10)]);
-    } else {
-      businessNameControl?.clearValidators();
-      categoriesControl?.clearValidators();
-      descriptionControl?.clearValidators();
-    }
-
-    businessNameControl?.updateValueAndValidity();
-    categoriesControl?.updateValueAndValidity();
-    descriptionControl?.updateValueAndValidity();
   }
 
   async onSubmit() {
@@ -122,15 +88,15 @@ export class RegisterPage implements OnInit {
         console.warn('Geolocation unavailable during registration; location will be null');
       }
 
-      // Prepare user data for backend registration
+      // Always register as provider — customer flow is account-less.
       const userData: BackendRegisterRequest = {
         email: formData.email,
         password: formData.password,
         fullName: formData.email.split('@')[0],
         username: this.generateValidUsername(formData.email),
         phone: formData.phone,
-        isProvider: formData.userType === 'provider',
-        categories: formData.userType === 'provider' ? this.selectedCategories : [],
+        isProvider: true,
+        categories: this.selectedCategories,
         location: location as any
       };
       
@@ -158,18 +124,14 @@ export class RegisterPage implements OnInit {
   }
 
   private async showSuccessAlert() {
-    const isProvider = this.backendAuth.isProvider();
-    const userType = isProvider ? 'proveedor' : 'usuario';
-    const homeRoute = isProvider ? '/provider/home' : '/user/home';
-    
     const alert = await this.alertCtrl.create({
-      header: '¡Cuenta Creada!',
-      message: `Tu cuenta de ${userType} ha sido creada exitosamente. Ya puedes comenzar a usar la aplicación.`,
+      header: '¡Cuenta creada!',
+      message: 'Tu cuenta de proveedor está lista. Ya puedes empezar a recibir solicitudes de clientes cercanos.',
       buttons: [
         {
           text: 'Comenzar',
           handler: () => {
-            this.router.navigate([homeRoute], { replaceUrl: true });
+            this.router.navigate(['/provider/home'], { replaceUrl: true });
           }
         }
       ]
@@ -365,8 +327,6 @@ export class RegisterPage implements OnInit {
   get password() { return this.registerForm.get('password'); }
   get confirmPassword() { return this.registerForm.get('confirmPassword'); }
   get phone() { return this.registerForm.get('phone'); }
-  get businessName() { return this.registerForm.get('businessName'); }
   get categories() { return this.registerForm.get('categories'); }
-  get description() { return this.registerForm.get('description'); }
   get acceptTerms() { return this.registerForm.get('acceptTerms'); }
 }

@@ -623,6 +623,153 @@
   }
 }
 
+// Example chips below the hero CTA
+.hero-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+
+  .examples-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    padding: 6px 0;
+  }
+
+  .example-chip {
+    appearance: none;
+    border: 1.5px solid rgba(15, 118, 110, 0.25);
+    background: rgba(15, 118, 110, 0.06);
+    color: #0f766e;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+
+    &:hover {
+      background: rgba(15, 118, 110, 0.12);
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+  }
+}
+
+// "¿Por qué AjustadoATi?" section
+.why-section {
+  padding: 64px 20px 56px;
+  background: #ffffff;
+
+  .section-heading--light {
+    span {
+      color: #0f766e;
+    }
+    h2 {
+      color: #0f172a;
+    }
+  }
+}
+
+.why-list {
+  max-width: 720px;
+  margin: 28px auto 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+
+    ion-icon {
+      flex-shrink: 0;
+      font-size: 22px;
+      color: #16a34a;
+      margin-top: 2px;
+    }
+
+    strong {
+      display: block;
+      color: #0f172a;
+      font-size: 1rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    span {
+      display: block;
+      color: #475569;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+  }
+}
+
+// "¿Eres profesional?" section
+.provider-cta-section {
+  padding: 60px 20px 72px;
+  background: linear-gradient(145deg, #0f766e 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.provider-cta {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+
+  .eyebrow {
+    display: inline-flex;
+    margin-bottom: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  p {
+    max-width: 520px;
+    margin: 14px auto 22px;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.92);
+  }
+}
+
+.provider-cta-button {
+  --background: #ffffff;
+  --color: #0f766e;
+  --border-radius: 14px;
+  --box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  min-height: 50px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .why-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .hero-section {
     padding-top: 42px;

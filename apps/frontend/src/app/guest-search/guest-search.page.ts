@@ -25,6 +25,7 @@ import { CategoryService } from '../services/category.service';
 import { GeolocationService, UserLocation } from '../services/geolocation.service';
 import { SearchRequestService, SearchSession } from '../services/search-request.service';
 import { GuestUserService } from '../services/guest-user.service';
+import { AnalyticsService } from '../services/analytics.service';
 import { Category } from '../interfaces/category';
 
 declare const google: any;
@@ -63,6 +64,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     private geolocationService: GeolocationService,
     private searchRequestService: SearchRequestService,
     private guestUserService: GuestUserService,
+    private analytics: AnalyticsService,
     private alertController: AlertController,
     private loadingController: LoadingController,
     private toastController: ToastController
@@ -107,6 +109,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   setupSearchSubscriptions() {
+    let previousResponseCount = 0;
     const sessionSub = this.searchRequestService.getCurrentSearchSession().subscribe(session => {
       this.currentSearchSession = session;
       // Recompute the template-bound list once per session emission instead
@@ -114,6 +117,15 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       // the page when polling kept emitting and Angular destroyed/recreated
       // every <ion-card> response on each CD cycle).
       this.rebuildRespondedProviders();
+
+      // Fire "first response received" once per search (0 → 1+ transition).
+      const currentResponseCount = session?.responses?.length || 0;
+      if (previousResponseCount === 0 && currentResponseCount > 0) {
+        this.analytics.track('guest_receive_response', {
+          providers_responded: currentResponseCount
+        });
+      }
+      previousResponseCount = currentResponseCount;
 
       if (session && this.modalStep === 'results') {
         const signature = this.buildMapSignature(session);
@@ -157,6 +169,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     this.locationErrorMessage = '';
     this.lastMapSignature = '';
     this.clearMap();
+    this.analytics.track('guest_open_search_modal');
   }
 
   closeSearchModal() {
@@ -245,11 +258,17 @@ export class GuestSearchPage implements OnInit, OnDestroy {
         this.searchErrorMessage = 'No encontramos proveedores disponibles cerca de tu ubicacion para esta categoria.';
       }
 
+      this.analytics.track('guest_submit_search', {
+        category: category?.name || 'unknown',
+        providers_found: searchSession.providers.length
+      });
+
       setTimeout(() => this.initializeResultsMap(), 250);
     } catch (error: any) {
       await loading.dismiss();
       console.error('Error creating guest search request:', error);
       this.searchErrorMessage = error?.message || 'No se pudo realizar la busqueda. Intentalo de nuevo.';
+      this.analytics.track('guest_search_error');
     }
   }
 
@@ -572,6 +591,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   private confirmGuestAccept(response: any): void {
+    this.analytics.track('guest_accept_offer');
     // Update local session state immediately so UI reflects acceptance
     this.searchRequestService.acceptProviderResponse(response.id);
     this.showToast('¡Oferta aceptada! Contacta al proveedor para coordinar.', 'success');

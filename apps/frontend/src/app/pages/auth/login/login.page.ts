@@ -62,12 +62,11 @@ export class LoginPage implements OnInit {
         throw new Error(backendResponse.message || 'Error al iniciar sesión');
       }
 
-      const isProvider = backendResponse.data.user.isProvider;
-      const route = isProvider ? '/provider/home' : '/user/home';
-      console.log('🔀 Navigating to:', route, '(isProvider:', isProvider, ')');
-
+      // Customer flow is account-less; every login is a provider.
+      // Legacy non-provider accounts still resolve to /provider/home to
+      // avoid breaking them — they just won't see useful data there.
       await this.showSuccessToast('¡Bienvenido!');
-      await this.router.navigate([route], { replaceUrl: true });
+      await this.router.navigate(['/provider/home'], { replaceUrl: true });
 
     } catch (error: any) {
       console.error('🚨 Login error:', error);

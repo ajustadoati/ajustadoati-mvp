@@ -1,80 +1,34 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { environment } from 'src/environments/environment';
 
-export interface PlatformMetrics {
-  userRegistrations: number;
-  providerRegistrations: number;
-  searchesPerformed: number;
-  contactsMade: number;
-  activeUsers: number;
-  popularCategories: string[];
+declare global {
+  interface Window {
+    plausible?: (
+      event: string,
+      options?: { props?: Record<string, string | number | boolean> }
+    ) => void;
+  }
 }
 
-@Injectable({
-  providedIn: 'root'
-})
+/**
+ * Thin wrapper around Plausible's `window.plausible()` so the rest of the
+ * app doesn't have to know it exists or worry about whether the script has
+ * finished loading. Calls are silently noop if Plausible isn't there —
+ * useful for local dev and for the period before the dashboard is
+ * configured on plausible.io.
+ *
+ * Custom event names go straight to Plausible; props become filterable
+ * dimensions in the dashboard.
+ */
+@Injectable({ providedIn: 'root' })
 export class AnalyticsService {
-  private apiUrl = environment.baseUrl + '/analytics';
-
-  constructor(private http: HttpClient) {}
-
-  // Eventos críticos de la plataforma
-  trackUserRegistration(source: 'mobile' | 'web') {
-    this.trackEvent('user_registration', { source });
-  }
-
-  trackProviderRegistration(categories: string[]) {
-    this.trackEvent('provider_registration', { categories });
-  }
-
-  trackSearch(query: string, category: string, location: any) {
-    this.trackEvent('search_performed', { query, category, location });
-  }
-
-  trackContact(providerType: string, contactMethod: 'whatsapp' | 'phone' | 'email') {
-    this.trackEvent('contact_made', { providerType, contactMethod });
-  }
-
-  trackAppOpen() {
-    this.trackEvent('app_opened', { timestamp: new Date() });
-  }
-
-  private trackEvent(eventName: string, data: any) {
-    const event = {
-      name: eventName,
-      data,
-      timestamp: new Date(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-
-    // Enviar al backend
-    this.http.post(`${this.apiUrl}/events`, event).subscribe({
-      next: () => console.log(`Event tracked: ${eventName}`),
-      error: (err) => console.error('Analytics error:', err)
-    });
-
-    // También enviar a Google Analytics si lo tienes
-    if ((window as any).gtag) {
-      (window as any).gtag('event', eventName, data);
-    }
-  }
-
-  // Obtener métricas generales del dashboard
-  async getPlatformMetrics(): Promise<PlatformMetrics> {
+  track(event: string, props?: Record<string, string | number | boolean>): void {
     try {
-      return await this.http.get<PlatformMetrics>(`${this.apiUrl}/summary-metrics`).toPromise() as PlatformMetrics;
-    } catch (error) {
-      console.error('Error getting platform metrics:', error);
-      return {
-        userRegistrations: 0,
-        providerRegistrations: 0,
-        searchesPerformed: 0,
-        contactsMade: 0,
-        activeUsers: 0,
-        popularCategories: []
-      };
+      if (typeof window === 'undefined' || typeof window.plausible !== 'function') {
+        return;
+      }
+      window.plausible(event, props ? { props } : undefined);
+    } catch {
+      // Analytics must never break user flow.
     }
   }
 }

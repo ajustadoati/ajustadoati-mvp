@@ -17,24 +17,34 @@
 <ion-content class="guest-content">
   <section class="hero-section">
     <div class="hero-copy">
-      <span class="eyebrow">Busqueda publica con GPS</span>
-      <h1>Encuentra servicios cercanos</h1>
+      <span class="eyebrow">Búsqueda en tiempo real</span>
+      <h1>¿Necesitas un producto o un servicio?</h1>
       <p>
-        Describe lo que necesitas y te mostramos en el mapa los proveedores disponibles cerca de ti.
+        Olvídate de llamar a varios negocios. Publica lo que necesitas y deja que los proveedores cercanos te contacten.
       </p>
 
       <div class="hero-actions">
         <ion-button size="large" class="hero-primary" (click)="openSearchModal()">
           <ion-icon name="search-outline" slot="start"></ion-icon>
-          Buscar servicio
+          Buscar ahora
         </ion-button>
+      </div>
+
+      <div class="hero-examples">
+        <span class="examples-label">Ejemplos:</span>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Fontanero</button>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Electricista</button>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Cerrajero</button>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Mecánico</button>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Aire acondicionado</button>
+        <button class="example-chip" type="button" (click)="openSearchModal()">Reformas</button>
       </div>
     </div>
   </section>
 
   <section id="how-it-works" class="how-section">
     <div class="section-heading">
-      <span>Como funciona</span>
+      <span>Cómo funciona</span>
       <h2>Un flujo simple para clientes y proveedores</h2>
     </div>
 
@@ -60,6 +70,56 @@
         <h3>Ambos se contactan al instante</h3>
         <p>El cliente ve quién respondió y puede escribirle por WhatsApp.</p>
       </article>
+    </div>
+  </section>
+
+  <section class="why-section">
+    <div class="section-heading section-heading--light">
+      <span>¿Por qué AjustadoATi?</span>
+      <h2>Sin vueltas, sin llamadas, sin esperar</h2>
+    </div>
+
+    <ul class="why-list">
+      <li>
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <div>
+          <strong>No llames a varios negocios</strong>
+          <span>Una sola solicitud y avisamos a todos los profesionales cercanos.</span>
+        </div>
+      </li>
+      <li>
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <div>
+          <strong>Respuestas en tiempo real</strong>
+          <span>Los proveedores responden en minutos, no en días.</span>
+        </div>
+      </li>
+      <li>
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <div>
+          <strong>Profesionales cercanos</strong>
+          <span>Solo proveedores en tu zona y de la categoría que pediste.</span>
+        </div>
+      </li>
+      <li>
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <div>
+          <strong>Tú decides con quién contactar</strong>
+          <span>Sin pagar nada, sin registro obligatorio para buscar.</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section class="provider-cta-section">
+    <div class="provider-cta">
+      <span class="eyebrow">¿Eres profesional?</span>
+      <h2>Recibe solicitudes reales de clientes cercanos</h2>
+      <p>Regístrate gratis y empieza a recibir oportunidades en tu zona y categoría.</p>
+      <ion-button size="large" class="provider-cta-button" (click)="goToRegister()">
+        <ion-icon name="person-add" slot="start"></ion-icon>
+        Quiero registrarme
+      </ion-button>
     </div>
   </section>
 </ion-content>
@@ -287,8 +347,7 @@
         </div>
 
         <div class="results-actions">
-          <ion-button fill="outline" (click)="backToForm()">Nueva busqueda</ion-button>
-          <ion-button color="success" (click)="goToRegister()">Crear cuenta</ion-button>
+          <ion-button fill="outline" (click)="backToForm()">Nueva búsqueda</ion-button>
         </div>
       </div>
     </ion-content>
