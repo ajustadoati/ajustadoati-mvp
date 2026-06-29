@@ -199,7 +199,7 @@
           </ion-card-header>
           <ion-card-content>
             <ion-list lines="full">
-              <ion-item *ngFor="let provider of currentSearchSession.providers; let i = index">
+              <ion-item *ngFor="let provider of currentSearchSession.providers; let i = index; trackBy: trackProviderById">
                 <ion-label>
                   <h3>{{ i + 1 }}. {{ provider.name }}</h3>
                   <p *ngIf="provider.locations && provider.locations.length > 0 && provider.locations[0].distance">
@@ -224,7 +224,7 @@
 
           <ion-card
             class="response-card"
-            *ngFor="let item of respondedProviders"
+            *ngFor="let item of respondedProviders; trackBy: trackResponseById"
             [class.response-card--accepted]="isResponseAccepted(item.response.id)"
           >
             <ion-card-content>

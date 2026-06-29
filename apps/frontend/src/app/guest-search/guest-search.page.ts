@@ -109,6 +109,11 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   setupSearchSubscriptions() {
     const sessionSub = this.searchRequestService.getCurrentSearchSession().subscribe(session => {
       this.currentSearchSession = session;
+      // Recompute the template-bound list once per session emission instead
+      // of on every change detection tick (used to be a getter, which froze
+      // the page when polling kept emitting and Angular destroyed/recreated
+      // every <ion-card> response on each CD cycle).
+      this.rebuildRespondedProviders();
 
       if (session && this.modalStep === 'results') {
         const signature = this.buildMapSignature(session);
@@ -290,11 +295,20 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     return this.currentSearchSession?.notifiedProvidersCount || 0;
   }
 
-  get respondedProviders(): Array<{
-    response: any;
-    whatsappUrl: string | null;
-  }> {
-    return (this.currentSearchSession?.responses || []).map(response => ({
+  respondedProviders: Array<{ response: any; whatsappUrl: string | null }> = [];
+
+  // *ngFor trackBy — keeps Angular from destroying and re-creating every
+  // ion-card / ion-icon when respondedProviders is replaced after polling.
+  trackResponseById(_index: number, item: { response: any }): string {
+    return item.response?.id;
+  }
+
+  trackProviderById(_index: number, provider: any): string {
+    return provider?.id;
+  }
+
+  private rebuildRespondedProviders(): void {
+    this.respondedProviders = (this.currentSearchSession?.responses || []).map(response => ({
       response,
       whatsappUrl: this.getWhatsAppUrl(response)
     }));
