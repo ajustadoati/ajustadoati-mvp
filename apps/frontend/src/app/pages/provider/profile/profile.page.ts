@@ -8,6 +8,7 @@ import { HybridGeolocationService, Position } from '../../../services/hybrid-geo
 import { AjustadoAtiWebSocketService } from '../../../services/ajustadoati-websocket.service';
 import { CategoryService } from '../../../services/category.service';
 import { BackendAuthService, BackendUserInfo } from '../../../services/backend-auth.service';
+import { ProviderWorkspaceService } from '../../../services/provider-workspace.service';
 import { Category } from '../../../interfaces/category';
 import { take } from 'rxjs/operators';
 import { firstValueFrom } from 'rxjs';
@@ -40,7 +41,8 @@ export class ProviderProfilePage implements OnInit {
     private geolocation: HybridGeolocationService,
     private websocket: AjustadoAtiWebSocketService,
     private categoryService: CategoryService,
-    private backendAuth: BackendAuthService
+    private backendAuth: BackendAuthService,
+    private providerWorkspace: ProviderWorkspaceService
   ) {
     this.profileForm = this.fb.group({
       name: ['', Validators.required],
@@ -342,6 +344,7 @@ export class ProviderProfilePage implements OnInit {
             await loading.present();
 
             try {
+              this.providerWorkspace.clearAll();
               this.backendAuth.logout();
               this.websocket.disconnect();
               await loading.dismiss();

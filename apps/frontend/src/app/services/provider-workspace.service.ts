@@ -26,6 +26,9 @@ const PENDING_REQUESTS_KEY = 'provider_pending_requests';
 const SENT_RESPONSES_KEY = 'provider_sent_responses';
 const ACTIVE_JOB_KEY = 'provider_active_job';
 const JOB_HISTORY_KEY = 'provider_job_history';
+// Tracks which provider owns the workspace data currently in localStorage so
+// we can detect when a different account logs in on the same browser.
+const WORKSPACE_OWNER_KEY = 'provider_workspace_owner';
 
 // Must match the backend's app.requests.expiration-minutes (default 15)
 const REQUEST_TTL_MS = 15 * 60 * 1000;
@@ -47,6 +50,41 @@ export class ProviderWorkspaceService {
     // offline when the backend broadcast the expiration), then keep pruning.
     this.pruneExpiredRequests();
     setInterval(() => this.pruneExpiredRequests(), 60000);
+  }
+
+  /**
+   * Called on every entry to the provider workspace (e.g. provider/home).
+   * If the persisted workspace belongs to a different provider — or to none —
+   * it is wiped so the new user starts clean. Otherwise it's a noop.
+   */
+  ensureBelongsTo(email: string | null | undefined): void {
+    if (!email) return;
+    const normalised = email.trim().toLowerCase();
+    const owner = (localStorage.getItem(WORKSPACE_OWNER_KEY) || '').trim().toLowerCase();
+    if (owner === normalised) {
+      return;
+    }
+    this.clearAll();
+    localStorage.setItem(WORKSPACE_OWNER_KEY, normalised);
+  }
+
+  /**
+   * Wipes every workspace key from localStorage and resets in-memory state.
+   * Use on logout, account switch, or "ensureBelongsTo" mismatch.
+   */
+  clearAll(): void {
+    try {
+      localStorage.removeItem(PENDING_REQUESTS_KEY);
+      localStorage.removeItem(SENT_RESPONSES_KEY);
+      localStorage.removeItem(ACTIVE_JOB_KEY);
+      localStorage.removeItem(JOB_HISTORY_KEY);
+      localStorage.removeItem(WORKSPACE_OWNER_KEY);
+    } catch {
+      // ignore storage failures (private mode etc.)
+    }
+    this.pendingRequestsSubject.next([]);
+    this.sentResponsesSubject.next([]);
+    this.activeJobSubject.next(null);
   }
 
   addIncomingRequest(request: ServiceRequest): void {

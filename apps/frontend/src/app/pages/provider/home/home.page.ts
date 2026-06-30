@@ -95,6 +95,10 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   private async loadUserProfile() {
     try {
       this.user = await this.auth.getFullUserProfile();
+      // Wipe the workspace if it belongs to a different account that
+      // previously logged in on this browser — otherwise the new
+      // provider would see ghost pending requests and sent responses.
+      this.providerWorkspace.ensureBelongsTo(this.user?.email);
       console.log('👤 Provider profile loaded:', this.user);
     } catch (error) {
       console.error('Error loading provider profile:', error);
@@ -330,6 +334,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
             await loading.present();
 
             try {
+              this.providerWorkspace.clearAll();
               this.auth.logout();
               this.websocket.disconnect();
               await loading.dismiss();
