@@ -90,11 +90,49 @@
           El teléfono es requerido
         </div>
 
-        <!-- Categories Selection -->
-        <div class="categories-section">
-          <div class="categories-header">
-            <h3>Categorías de Servicio</h3>
-            <p>Selecciona las categorías en las que ofreces servicios</p>
+        <!-- Location (mandatory) -->
+        <div class="location-section" [attr.data-status]="locationStatus">
+          <div class="section-header">
+            <h3>Tu ubicación <span class="required-badge">obligatorio</span></h3>
+            <p>Solo recibirás solicitudes de clientes cercanos a tu zona.</p>
+          </div>
+
+          <div class="location-panel" [attr.data-status]="locationStatus">
+            <div class="location-icon-wrap">
+              <ion-icon
+                [name]="userLocation ? 'checkmark-circle' : (isLocationLoading ? 'hourglass-outline' : 'location-outline')"
+              ></ion-icon>
+            </div>
+            <div class="location-info">
+              <strong *ngIf="locationStatus === 'ok'">Ubicación detectada</strong>
+              <strong *ngIf="locationStatus === 'loading'">Solicitando ubicación…</strong>
+              <strong *ngIf="locationStatus === 'pending'">Ubicación pendiente</strong>
+              <strong *ngIf="locationStatus === 'error'">Ubicación no disponible</strong>
+
+              <span *ngIf="locationStatus === 'ok' && userLocation">
+                {{ userLocation.latitude.toFixed(4) }}, {{ userLocation.longitude.toFixed(4) }}
+              </span>
+              <span *ngIf="locationStatus === 'loading'">Acepta el aviso del navegador para continuar.</span>
+              <span *ngIf="locationStatus === 'pending'">Pulsa el botón para compartir tu ubicación.</span>
+              <span *ngIf="locationStatus === 'error'">{{ locationError }}</span>
+            </div>
+            <ion-button
+              fill="solid"
+              size="small"
+              type="button"
+              (click)="requestLocation()"
+              [disabled]="isLocationLoading"
+            >
+              {{ userLocation ? 'Actualizar' : 'Compartir ubicación' }}
+            </ion-button>
+          </div>
+        </div>
+
+        <!-- Categories Selection (mandatory) -->
+        <div class="categories-section" [class.invalid]="categories?.invalid && categories?.touched">
+          <div class="section-header">
+            <h3>Categorías de servicio <span class="required-badge">obligatorio</span></h3>
+            <p>Solo recibirás solicitudes de las categorías que selecciones. Toca al menos una.</p>
           </div>
 
           <div *ngIf="loadingCategories" class="loading-categories">
@@ -138,11 +176,18 @@
           expand="block"
           type="submit"
           class="register-button"
-          [disabled]="isLoading"
+          [disabled]="isLoading || !userLocation || selectedCategories.length === 0"
         >
           <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
-          <span *ngIf="!isLoading">Crear Cuenta</span>
+          <span *ngIf="!isLoading">Crear cuenta</span>
         </ion-button>
+
+        <p class="submit-hint" *ngIf="!userLocation">
+          Comparte tu ubicación arriba para activar el botón de registro.
+        </p>
+        <p class="submit-hint" *ngIf="userLocation && selectedCategories.length === 0">
+          Selecciona al menos una categoría para activar el botón de registro.
+        </p>
       </form>
 
       <!-- Login Section -->

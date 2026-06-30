@@ -24,6 +24,11 @@ export class RegisterPage implements OnInit {
   selectedCategories: number[] = [];
   loadingCategories = false;
 
+  // Location state — registration is blocked until we have one
+  userLocation: { latitude: number; longitude: number } | null = null;
+  isLocationLoading = false;
+  locationError = '';
+
   constructor(
     private fb: FormBuilder,
     private backendAuth: BackendAuthService,
@@ -49,19 +54,59 @@ export class RegisterPage implements OnInit {
   async ngOnInit() {
     console.log('📝 Register page initialized');
     await this.loadCategories();
+    // Trigger the browser permission prompt up-front so the provider
+    // grants location once and the submit button enables on its own,
+    // rather than failing silently at the end of the flow.
+    this.requestLocation();
+  }
+
+  async requestLocation() {
+    this.isLocationLoading = true;
+    this.locationError = '';
+    try {
+      const pos = await this.geolocationService.getCurrentPosition();
+      this.userLocation = { latitude: pos.lat, longitude: pos.lng };
+    } catch (err) {
+      this.userLocation = null;
+      this.locationError =
+        'No se pudo obtener tu ubicación. Activa el GPS o permite el acceso a la ubicación en tu navegador y vuelve a intentarlo.';
+      console.warn('Geolocation denied during registration:', err);
+    } finally {
+      this.isLocationLoading = false;
+    }
+  }
+
+  get locationStatus(): 'pending' | 'loading' | 'ok' | 'error' {
+    if (this.isLocationLoading) return 'loading';
+    if (this.userLocation) return 'ok';
+    if (this.locationError) return 'error';
+    return 'pending';
   }
 
   async onSubmit() {
     console.log('📝 Form submitted');
-    console.log('Form valid:', this.registerForm.valid);
-    console.log('Form value:', this.registerForm.value);
-    console.log('Form errors:', this.getFormErrors());
-    
+
+    if (!this.userLocation) {
+      // Give the user a second chance — maybe they denied first time and
+      // now agree to share location.
+      await this.requestLocation();
+      if (!this.userLocation) {
+        await this.showErrorToast('Necesitamos tu ubicación para registrarte como proveedor.');
+        return;
+      }
+    }
+
+    if (this.selectedCategories.length === 0) {
+      this.registerForm.get('categories')?.markAsTouched();
+      await this.showErrorToast('Selecciona al menos una categoría de servicio.');
+      return;
+    }
+
     if (this.registerForm.valid) {
       await this.register();
     } else {
       this.markFormGroupTouched();
-      await this.showErrorToast('Por favor completa todos los campos requeridos');
+      await this.showErrorToast('Por favor completa todos los campos requeridos.');
     }
   }
 
@@ -77,18 +122,8 @@ export class RegisterPage implements OnInit {
       const formData = this.registerForm.value;
       console.log('📝 Attempting registration for:', formData.email);
 
-      // Try to get the device's real location; fall back to null so the
-      // provider can set it later from their profile instead of being
-      // registered with wrong coordinates.
-      let location: { latitude: number; longitude: number; address?: string } | null = null;
-      try {
-        const pos = await this.geolocationService.getCurrentPosition();
-        location = { latitude: pos.lat, longitude: pos.lng };
-      } catch {
-        console.warn('Geolocation unavailable during registration; location will be null');
-      }
-
-      // Always register as provider — customer flow is account-less.
+      // userLocation is guaranteed at this point because onSubmit() blocks
+      // when it's missing.
       const userData: BackendRegisterRequest = {
         email: formData.email,
         password: formData.password,
@@ -97,7 +132,7 @@ export class RegisterPage implements OnInit {
         phone: formData.phone,
         isProvider: true,
         categories: this.selectedCategories,
-        location: location as any
+        location: this.userLocation as any
       };
       
       // Register user with backend

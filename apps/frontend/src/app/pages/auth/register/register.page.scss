@@ -223,7 +223,159 @@
   }
 }
 
+// Mandatory location / categories blocks — section headers + required badges
+.section-header {
+  margin-bottom: 12px;
+
+  h3 {
+    margin: 0 0 4px;
+    color: #0f172a;
+    font-size: 1.05rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+}
+
+.required-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+// Location section
+.location-section {
+  margin: 18px 0;
+}
+
+.location-panel {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+
+  &[data-status="ok"] {
+    border-color: rgba(22, 163, 74, 0.45);
+    background: rgba(22, 163, 74, 0.06);
+
+    .location-icon-wrap {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+  }
+
+  &[data-status="loading"],
+  &[data-status="pending"] {
+    border-color: rgba(37, 99, 235, 0.4);
+    background: rgba(37, 99, 235, 0.05);
+
+    .location-icon-wrap {
+      background: #dbeafe;
+      color: #2563eb;
+    }
+  }
+
+  &[data-status="error"] {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.06);
+
+    .location-icon-wrap {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+  }
+
+  .location-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    color: #475569;
+
+    ion-icon {
+      font-size: 24px;
+    }
+  }
+
+  .location-info {
+    min-width: 0;
+
+    strong {
+      display: block;
+      color: #0f172a;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    span {
+      display: block;
+      margin-top: 2px;
+      color: #64748b;
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+  }
+
+  ion-button {
+    --border-radius: 999px;
+    text-transform: none;
+    font-weight: 700;
+  }
+}
+
+// Categories section — invalid state highlight
+.categories-section.invalid {
+  .section-header h3 {
+    color: #b91c1c;
+  }
+
+  .categories-grid {
+    outline: 2px solid rgba(239, 68, 68, 0.4);
+    outline-offset: 4px;
+    border-radius: 12px;
+  }
+}
+
+// Submit hint below the create-account button
+.submit-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
 /* Responsive */
+@media (max-width: 400px) {
+  .location-panel {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+}
+
 @media (max-width: 400px) {
   :host {
     .register-container {
