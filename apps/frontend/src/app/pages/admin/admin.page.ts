@@ -1,17 +1,20 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { FormsModule } from '@angular/forms';
+import { IonicModule, ToastController } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   arrowBackOutline,
   businessOutline,
   checkmarkCircle,
+  chatbubbleEllipsesOutline,
   closeCircle,
   ellipse,
   flaskOutline,
   peopleOutline,
   refreshOutline,
+  sendOutline,
   wifiOutline
 } from 'ionicons/icons';
 import { AdminService, AdminProvider, AdminStats, GuestRequestSummary } from '../../services/admin.service';
@@ -24,7 +27,7 @@ import { firstValueFrom } from 'rxjs';
   templateUrl: './admin.page.html',
   styleUrls: ['./admin.page.scss'],
   standalone: true,
-  imports: [CommonModule, IonicModule]
+  imports: [CommonModule, FormsModule, IonicModule]
 })
 export class AdminPage implements OnInit {
   stats: AdminStats | null = null;
@@ -35,20 +38,29 @@ export class AdminPage implements OnInit {
   isForbidden = false;
   errorMessage = '';
 
+  // Respond-as-admin modal state
+  respondModalOpen = false;
+  respondTarget: GuestRequestSummary | null = null;
+  respondMessage = '';
+  isSendingResponse = false;
+
   constructor(
     private adminService: AdminService,
     private categoryService: CategoryService,
-    private router: Router
+    private router: Router,
+    private toastCtrl: ToastController
   ) {
     addIcons({
       arrowBackOutline,
       businessOutline,
       checkmarkCircle,
+      chatbubbleEllipsesOutline,
       closeCircle,
       ellipse,
       flaskOutline,
       peopleOutline,
       refreshOutline,
+      sendOutline,
       wifiOutline
     });
   }
@@ -113,5 +125,50 @@ export class AdminPage implements OnInit {
 
   goBack() {
     this.router.navigate(['/']);
+  }
+
+  canRespond(request: GuestRequestSummary): boolean {
+    return request.status !== 'expired' && request.status !== 'accepted';
+  }
+
+  openRespondModal(request: GuestRequestSummary) {
+    this.respondTarget = request;
+    this.respondMessage = '';
+    this.respondModalOpen = true;
+  }
+
+  closeRespondModal() {
+    this.respondModalOpen = false;
+    this.respondTarget = null;
+    this.respondMessage = '';
+  }
+
+  async sendResponse() {
+    const target = this.respondTarget;
+    const message = this.respondMessage.trim();
+    if (!target || !message) return;
+
+    this.isSendingResponse = true;
+    try {
+      await this.adminService.respondToGuestRequest(target.requestId, message);
+      await this.showToast('Respuesta enviada al cliente.', 'success');
+      this.closeRespondModal();
+      await this.loadData();
+    } catch (error: any) {
+      const msg = error?.error?.message || 'No se pudo enviar la respuesta.';
+      await this.showToast(msg, 'danger');
+    } finally {
+      this.isSendingResponse = false;
+    }
+  }
+
+  private async showToast(message: string, color: 'success' | 'danger') {
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 3000,
+      color,
+      position: 'top'
+    });
+    await toast.present();
   }
 }

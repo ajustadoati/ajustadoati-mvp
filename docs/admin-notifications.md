@@ -54,7 +54,49 @@ Las solicitudes demo viven en memoria: se pierden al reiniciar el backend
 - Muestra: totales, proveedores registrados (fecha, categorías, GPS, conectado
   ahora, estado de la demo) y el estado de cada solicitud de prueba.
 
-## 4. Email al admin cuando se registra un proveedor (vía Supabase)
+## 3.1 Responder como AjustadoATi desde el backoffice
+
+Cada `guest-request` en `/admin` (que no esté caducada ni aceptada, y que
+no sea `demo`) muestra un botón **Responder** que abre un modal para
+escribir un mensaje. El backend registra la respuesta como si viniera del
+"equipo AjustadoATi" y aparece en el modal del guest igual que la
+respuesta de cualquier proveedor real.
+
+Variables de entorno del responder (con valores por defecto):
+
+```
+ADMIN_RESPONDER_NAME=AjustadoATi
+ADMIN_RESPONDER_EMAIL=equipo@ajustadoati.com
+ADMIN_RESPONDER_PHONE=+34632624665
+```
+
+`ADMIN_RESPONDER_PHONE` es el número que aparecerá en el botón de WhatsApp
+del cliente. Cambia el env var y redeploy si quieres redirigir esos
+contactos a otro número.
+
+## 4. Email al admin cuando llega una búsqueda (Resend directo desde el backend)
+
+Cuando un guest crea una solicitud, el backend envía un email a cada
+dirección de `app.admin.emails` con un botón "Ver en el backoffice".
+Necesita una cuenta de Resend (gratis, 100 emails/día):
+
+1. https://resend.com/register → crea cuenta con `richardroj@gmail.com`.
+2. **API Keys** → **Create API Key** → copia la clave (empieza por `re_`).
+3. En el VPS, exporta la variable antes de arrancar el backend:
+
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
+RESEND_FROM="AjustadoATi <onboarding@resend.dev>"
+```
+
+`onboarding@resend.dev` es el remitente sandbox de Resend; funciona sin
+verificar dominio. Para producción real, verifica `ajustadoati.com` en
+Resend y cambia `RESEND_FROM` a `AjustadoATi <no-reply@ajustadoati.com>`.
+
+Si `RESEND_API_KEY` está vacío (default), el envío es silencioso — no
+rompe nada, sólo no llegan los emails.
+
+## 5. Email al admin cuando se registra un proveedor (vía Supabase)
 
 Supabase no envía emails arbitrarios por sí solo, pero se puede montar sin tocar
 el backend usando **Database Webhooks + Edge Function + Resend** (gratis hasta

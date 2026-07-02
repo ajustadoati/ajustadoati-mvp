@@ -139,3 +139,89 @@
 .provider-status {
   flex-shrink: 0;
 }
+
+.demo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+
+  ion-button {
+    --border-radius: 12px;
+    text-transform: none;
+    font-weight: 700;
+  }
+}
+
+// Respond-as-admin modal
+.respond-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+
+  .respond-label {
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 6px;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  strong {
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .respond-quote {
+    margin: 4px 0 0;
+    color: #334155;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    font-style: italic;
+  }
+}
+
+.respond-message-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.respond-textarea {
+  --background: #ffffff;
+  --color: #0f172a;
+  --placeholder-color: #94a3b8;
+  --placeholder-opacity: 1;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  border-radius: 12px;
+  border: 1.5px solid #cbd5e1;
+  min-height: 120px;
+}
+
+.respond-hint {
+  margin: 10px 0 22px;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.respond-submit {
+  --border-radius: 14px;
+  font-weight: 700;
+}

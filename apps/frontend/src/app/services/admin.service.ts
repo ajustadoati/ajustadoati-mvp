@@ -78,4 +78,13 @@ export class AdminService {
     );
     return response.data || [];
   }
+
+  async respondToGuestRequest(requestId: string, message: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post<any>(
+        `${environment.baseUrl}/admin/guest-requests/${requestId}/respond`,
+        { message }
+      )
+    );
+  }
 }

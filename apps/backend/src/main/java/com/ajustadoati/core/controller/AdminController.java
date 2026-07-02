@@ -5,11 +5,13 @@ import com.ajustadoati.core.dto.AdminDto.AdminStatsDto;
 import com.ajustadoati.core.dto.AdminDto.DemoRequestSummary;
 import com.ajustadoati.core.dto.AdminDto.GuestRequestSummary;
 import com.ajustadoati.core.dto.CommonDto.ApiResponse;
+import com.ajustadoati.core.dto.CommonDto.GuestRequestResponseDto;
 import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Profile;
 import com.ajustadoati.core.repository.ProfileRepository;
 import com.ajustadoati.core.service.GuestRequestService;
 import com.ajustadoati.core.websocket.ConnectionRegistry;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,10 +19,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.Optional;
 
 @RestController
@@ -98,6 +104,34 @@ public class AdminController {
         if (forbidden != null) return forbidden;
 
         return ResponseEntity.ok(ApiResponse.success(guestRequestService.getAllRequests()));
+    }
+
+    public record AdminRespondRequest(@NotBlank String message) {}
+
+    /**
+     * Allows the admin to answer a guest search as "AjustadoATi" from the
+     * backoffice — used to keep curious first-time searches warm while the
+     * network of real providers is still small.
+     */
+    @PostMapping("/guest-requests/{requestId}/respond")
+    public ResponseEntity<ApiResponse<GuestRequestResponseDto>> respondAsAdmin(
+            @PathVariable UUID requestId,
+            @RequestBody AdminRespondRequest body,
+            Authentication authentication) {
+        ResponseEntity<ApiResponse<GuestRequestResponseDto>> forbidden = checkAdmin(authentication);
+        if (forbidden != null) return forbidden;
+
+        if (body == null || body.message() == null || body.message().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("El mensaje es obligatorio"));
+        }
+
+        try {
+            GuestRequestResponseDto response = guestRequestService.respondAsAdmin(requestId, body.message().trim());
+            return ResponseEntity.ok(ApiResponse.success("Respuesta registrada", response));
+        } catch (RuntimeException e) {
+            log.error("[ADMIN-RESPUESTA] error en peticion {}", requestId, e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(e.getMessage()));
+        }
     }
 
     /**

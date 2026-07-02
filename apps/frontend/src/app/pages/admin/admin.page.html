@@ -119,10 +119,72 @@
                 · {{ request.responsesCount }} respuesta(s)
               </span>
             </div>
-            <ion-badge [color]="requestStatusColor(request)">{{ requestStatusLabel(request) }}</ion-badge>
+            <div class="demo-actions">
+              <ion-badge [color]="requestStatusColor(request)">{{ requestStatusLabel(request) }}</ion-badge>
+              <ion-button
+                *ngIf="canRespond(request) && !request.demo"
+                size="small"
+                fill="solid"
+                (click)="openRespondModal(request)"
+              >
+                <ion-icon slot="start" name="chatbubble-ellipses-outline"></ion-icon>
+                Responder
+              </ion-button>
+            </div>
           </div>
         </ion-card-content>
       </ion-card>
     </ng-container>
   </div>
 </ion-content>
+
+<!-- Respond as admin ("AjustadoATi") -->
+<ion-modal [isOpen]="respondModalOpen" (didDismiss)="closeRespondModal()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button (click)="closeRespondModal()">
+            <ion-icon slot="icon-only" name="close-circle"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+        <ion-title>Responder como AjustadoATi</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <div class="respond-context" *ngIf="respondTarget">
+        <span class="respond-label">Categoría</span>
+        <strong>{{ respondTarget.categoryName }}</strong>
+
+        <span class="respond-label">Solicitud del cliente</span>
+        <p class="respond-quote">"{{ respondTarget.message }}"</p>
+      </div>
+
+      <label class="respond-message-label" for="respondMessage">Tu respuesta</label>
+      <ion-textarea
+        id="respondMessage"
+        [(ngModel)]="respondMessage"
+        rows="5"
+        maxlength="400"
+        [counter]="true"
+        placeholder="Ej: Hola, podemos ayudarte con eso. Contáctanos por WhatsApp para coordinar."
+        class="respond-textarea"
+      ></ion-textarea>
+      <p class="respond-hint">
+        El cliente verá esta respuesta como si viniera del equipo AjustadoATi
+        y podrá contactarte por WhatsApp al número configurado.
+      </p>
+
+      <ion-button
+        expand="block"
+        (click)="sendResponse()"
+        [disabled]="!respondMessage.trim() || isSendingResponse"
+        class="respond-submit"
+      >
+        <ion-spinner *ngIf="isSendingResponse" name="crescent"></ion-spinner>
+        <ion-icon *ngIf="!isSendingResponse" name="send-outline" slot="start"></ion-icon>
+        <span *ngIf="!isSendingResponse">Enviar respuesta</span>
+      </ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
