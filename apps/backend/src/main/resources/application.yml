@@ -1,3 +1,4 @@
+# chore: bump to trigger backend redeploy (2026-07-03)
 spring:
   application:
     name: ajustadoati-core
