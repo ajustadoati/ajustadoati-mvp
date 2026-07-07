@@ -18,6 +18,44 @@
 </ion-header>
 
 <ion-content [fullscreen]="true" class="ion-padding">
+  <!-- Install-as-app banner (Android Chrome fires beforeinstallprompt;
+       iOS Safari shows the manual instructions variant) -->
+  <div class="pwa-banner pwa-banner--install" *ngIf="showInstallBanner">
+    <ion-icon name="phone-portrait-outline"></ion-icon>
+    <div class="pwa-banner-text">
+      <strong>Instala AjustadoATi en tu móvil</strong>
+      <span *ngIf="!isIosStandaloneCandidate">Recibirás las solicitudes como si fuera una app.</span>
+      <span *ngIf="isIosStandaloneCandidate">
+        En iPhone: pulsa <ion-icon name="share-outline"></ion-icon> "Compartir" y luego "Añadir a pantalla de inicio".
+      </span>
+    </div>
+    <div class="pwa-banner-actions">
+      <ion-button size="small" fill="solid" (click)="promptInstall()" *ngIf="!isIosStandaloneCandidate">
+        Instalar
+      </ion-button>
+      <ion-button size="small" fill="clear" color="light" (click)="dismissInstallBanner()">
+        Después
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Enable Web Push banner -->
+  <div class="pwa-banner pwa-banner--push" *ngIf="showPushBanner">
+    <ion-icon name="notifications-outline"></ion-icon>
+    <div class="pwa-banner-text">
+      <strong>Activa las notificaciones</strong>
+      <span>Recibirás las solicitudes de clientes aunque no tengas la app abierta.</span>
+    </div>
+    <div class="pwa-banner-actions">
+      <ion-button size="small" fill="solid" color="light" (click)="enablePush()">
+        Activar
+      </ion-button>
+      <ion-button size="small" fill="clear" color="light" (click)="dismissPushBanner()">
+        Después
+      </ion-button>
+    </div>
+  </div>
+
   <!-- Header con saludo -->
   <div class="header-card">
     <h1 class="greeting">{{ greetingText }}, {{ user?.fullName || 'Proveedor' }}!</h1>

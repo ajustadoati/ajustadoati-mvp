@@ -497,3 +497,66 @@ ion-content {
     grid-template-columns: 1fr;
   }
 }
+
+// PWA banners (install / enable push) — sit above the header, dismissible
+.pwa-banner {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin: 0 0 12px;
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.18);
+
+  > ion-icon:first-child {
+    font-size: 26px;
+    grid-row: 1 / span 2;
+  }
+
+  .pwa-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    strong {
+      font-size: 0.98rem;
+      font-weight: 800;
+    }
+
+    span {
+      font-size: 0.85rem;
+      opacity: 0.92;
+      line-height: 1.4;
+
+      ion-icon {
+        font-size: 14px;
+        vertical-align: -2px;
+      }
+    }
+  }
+
+  .pwa-banner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    grid-row: 1 / span 2;
+
+    ion-button {
+      --border-radius: 10px;
+      text-transform: none;
+      font-weight: 700;
+      margin: 0;
+    }
+  }
+
+  &--install {
+    background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+  }
+
+  &--push {
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  }
+}

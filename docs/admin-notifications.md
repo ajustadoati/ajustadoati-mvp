@@ -96,6 +96,62 @@ Resend y cambia `RESEND_FROM` a `AjustadoATi <no-reply@ajustadoati.com>`.
 Si `RESEND_API_KEY` está vacío (default), el envío es silencioso — no
 rompe nada, sólo no llegan los emails.
 
+## 4.1 Web Push a proveedores (PWA)
+
+Los proveedores pueden instalar AjustadoATi como PWA en su móvil y recibir
+notificaciones nativas cuando llega una solicitud aunque la app esté
+cerrada. Cómo funciona:
+
+- Al abrir `/provider/home` desde móvil ven un banner "Instala AjustadoATi"
+  (Android/Chrome dispara `beforeinstallprompt`; iOS Safari muestra
+  instrucciones manuales)
+- Después ven un banner "Activa las notificaciones" que llama a la API
+  Push del navegador y registra la suscripción en el backend
+- Cuando llega una guest search y el proveedor coincide por categoría +
+  distancia PERO no tiene sesión WebSocket abierta, el backend le envía
+  Web Push a todos los endpoints registrados
+
+Requisitos:
+
+- **HTTPS obligatorio** (Service Worker no funciona en HTTP)
+- **iOS 16.4+** solo si el usuario ha añadido la PWA a la pantalla de inicio
+- **Android Chrome/Firefox/Edge**: funciona en el navegador o como PWA
+
+Setup en el VPS:
+
+```bash
+# Generar el par VAPID una sola vez (guardar seguro, no se puede rotar sin
+# invalidar todas las suscripciones existentes):
+npx web-push generate-vapid-keys --json
+```
+
+Añadir al `.env.production`:
+
+```bash
+VAPID_PUBLIC_KEY=BIdao-...   # la clave publica que genera arriba
+VAPID_PRIVATE_KEY=BldEW14... # la clave privada
+VAPID_SUBJECT=mailto:richardroj@gmail.com
+```
+
+Reiniciar el contenedor. Si las claves están vacías, el push queda
+deshabilitado silenciosamente y la app cae al modo WebSocket-only.
+
+Migración obligatoria antes de arrancar la primera vez:
+
+```sql
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_profile ON push_subscriptions (profile_id);
+```
+
 ## 5. Email al admin cuando se registra un proveedor (vía Supabase)
 
 Supabase no envía emails arbitrarios por sí solo, pero se puede montar sin tocar

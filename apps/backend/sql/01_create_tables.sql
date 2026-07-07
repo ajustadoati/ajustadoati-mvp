@@ -69,6 +69,21 @@ CREATE INDEX IF NOT EXISTS idx_profile_categories_profile ON profile_categories 
 CREATE INDEX IF NOT EXISTS idx_profile_categories_category ON profile_categories (category_id);
 
 -- ================================
+-- 3.1 Push subscriptions (Web Push)
+-- ================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_profile ON push_subscriptions (profile_id);
+
+-- ================================
 -- 4. Requests Table
 -- ================================
 CREATE TABLE IF NOT EXISTS requests (

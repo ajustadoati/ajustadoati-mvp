@@ -6,6 +6,7 @@ import com.ajustadoati.core.dto.CommonDto.GuestRequestResponseDto;
 import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Category;
 import com.ajustadoati.core.repository.CategoryRepository;
+import com.ajustadoati.core.repository.ProfileRepository;
 import com.ajustadoati.core.websocket.ConnectionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +33,10 @@ public class GuestRequestService {
 
     private final ConnectionRegistry connectionRegistry;
     private final CategoryRepository categoryRepository;
+    private final ProfileRepository profileRepository;
     private final ObjectMapper objectMapper;
     private final ResendEmailService emailService;
+    private final WebPushService webPushService;
 
     private final Map<UUID, GuestRequestSession> sessions = new ConcurrentHashMap<>();
 
@@ -457,7 +460,42 @@ public class GuestRequestService {
 
         log.info("[PETICION] {} → notificados {}/{} proveedores",
                 session.id, successfulSends, providerSessions.size());
+
+        // Fire Web Push to any nearby provider that ISN'T currently connected
+        // by WebSocket — they wouldn't otherwise learn about the request until
+        // they next open the app.
+        try {
+            notifyOfflineProvidersByPush(session);
+        } catch (Exception e) {
+            log.warn("[WEBPUSH] fallo notificando push a proveedores offline", e);
+        }
+
         return successfulSends;
+    }
+
+    private void notifyOfflineProvidersByPush(GuestRequestSession session) {
+        if (!webPushService.isEnabled()) return;
+        List<Object[]> nearby = profileRepository.findNearbyProviders(
+                session.categoryId, session.latitude, session.longitude, session.maxDistanceKm);
+        int pushed = 0;
+        for (Object[] row : nearby) {
+            java.util.UUID profileId = row[0] instanceof java.util.UUID u
+                    ? u : java.util.UUID.fromString(row[0].toString());
+            String email = (String) row[3];
+            if (email != null && connectionRegistry.isUserConnected(email)) {
+                continue; // Ya recibió por WebSocket
+            }
+            int delivered = webPushService.sendToUser(
+                    profileId,
+                    "Nueva solicitud: " + session.categoryName,
+                    session.message,
+                    "/provider/home");
+            if (delivered > 0) pushed++;
+        }
+        if (pushed > 0) {
+            log.info("[WEBPUSH] peticion {} → {} proveedores offline notificados por push",
+                    session.id, pushed);
+        }
     }
 
     private boolean sendMessageToSession(WebSocketSession session, WebSocketDto.OutgoingMessage message) {

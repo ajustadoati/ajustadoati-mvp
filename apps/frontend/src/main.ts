@@ -1,4 +1,6 @@
 import { bootstrapApplication } from '@angular/platform-browser';
+import { isDevMode } from '@angular/core';
+import { provideServiceWorker } from '@angular/service-worker';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -32,6 +34,9 @@ import {
   callOutline,
   cashOutline,
   shieldCheckmarkOutline,
+  phonePortraitOutline,
+  notificationsOutline,
+  shareOutline,
   settingsOutline,
   informationCircleOutline,
   wifiOutline,
@@ -101,6 +106,9 @@ addIcons({
   'call-outline': callOutline,
   'cash-outline': cashOutline,
   'shield-checkmark-outline': shieldCheckmarkOutline,
+  'phone-portrait-outline': phonePortraitOutline,
+  'notifications-outline': notificationsOutline,
+  'share-outline': shareOutline,
   'settings-outline': settingsOutline,
   'information-circle-outline': informationCircleOutline,
   'wifi-outline': wifiOutline,
@@ -158,5 +166,12 @@ bootstrapApplication(AppComponent, {
     provideHttpClient(
       withInterceptors([authInterceptor])
     ),
+    // Registers the Angular Service Worker in production so the app can be
+    // installed as a PWA and receive Web Push notifications. Waits 30s
+    // after stability so it doesn't compete with initial hydration.
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
   ],
 });

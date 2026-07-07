@@ -16,8 +16,14 @@ import {
   ProviderWorkspaceService
 } from '../../../services/provider-workspace.service';
 import { AdminService } from '../../../services/admin.service';
+import { PushNotificationService } from '../../../services/push-notification.service';
 import { ProviderActiveJob } from '../../../interfaces/request.interface';
 import { LocalNotifications } from '@capacitor/local-notifications';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 @Component({
   selector: 'app-provider-home',
@@ -38,6 +44,14 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
   isAdmin = false;
 
+  // PWA install prompt (Android/Chrome) & Web Push state
+  showInstallBanner = false;
+  private deferredInstall?: BeforeInstallPromptEvent;
+  showPushBanner = false;
+  isIosStandaloneCandidate = false; // iOS Safari, not yet in home screen
+  private readonly PUSH_BANNER_DISMISSED_KEY = 'push_banner_dismissed_at';
+  private readonly INSTALL_BANNER_DISMISSED_KEY = 'install_banner_dismissed_at';
+
   pendingRequests: ServiceRequest[] = [];
   sentResponses: ProviderSentResponse[] = [];
   activeJob: ProviderActiveJob | null = null;
@@ -53,6 +67,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     private websocket: AjustadoAtiWebSocketService,
     private geolocation: HybridGeolocationService,
     private providerWorkspace: ProviderWorkspaceService,
+    private pushNotifications: PushNotificationService,
     private adminService: AdminService
   ) {}
 
@@ -78,6 +93,111 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
     // Show admin button only for accounts listed in the backend's ADMIN_EMAILS
     this.adminService.checkAccess().then(isAdmin => (this.isAdmin = isAdmin));
+
+    // Wire the "install to home screen" prompt (Android/Chrome)
+    this.wireInstallPrompt();
+
+    // Route push notification clicks to /provider/home (or the URL in payload)
+    this.pushNotifications.wireClickHandler('/provider/home');
+
+    // Show "Activar notificaciones" banner if push is supported but not yet enabled
+    void this.evaluatePushBanner();
+  }
+
+  private wireInstallPrompt(): void {
+    if (this.isStandalone()) return;
+
+    const dismissed = this.wasDismissedRecently(this.INSTALL_BANNER_DISMISSED_KEY);
+
+    window.addEventListener('beforeinstallprompt', (e: Event) => {
+      e.preventDefault();
+      this.deferredInstall = e as BeforeInstallPromptEvent;
+      if (!dismissed) this.showInstallBanner = true;
+    });
+
+    // iOS Safari fires no event — show a manual card if we detect it
+    if (this.isIosSafari() && !dismissed) {
+      this.isIosStandaloneCandidate = true;
+      this.showInstallBanner = true;
+    }
+  }
+
+  async promptInstall() {
+    if (this.deferredInstall) {
+      await this.deferredInstall.prompt();
+      const choice = await this.deferredInstall.userChoice;
+      if (choice.outcome === 'accepted') {
+        this.showInstallBanner = false;
+      }
+      this.deferredInstall = undefined;
+      return;
+    }
+    // iOS: nothing to prompt — the CTA is instructions
+    this.showToast(
+      'En iPhone: pulsa "Compartir" y luego "Añadir a pantalla de inicio".',
+      'success'
+    );
+  }
+
+  dismissInstallBanner() {
+    this.showInstallBanner = false;
+    localStorage.setItem(this.INSTALL_BANNER_DISMISSED_KEY, String(Date.now()));
+  }
+
+  private async evaluatePushBanner() {
+    if (!this.pushNotifications.isSupported()) return;
+    const perm = this.pushNotifications.currentPermission();
+    if (perm === 'denied' || perm === 'granted') {
+      const subscribed = await this.pushNotifications.isSubscribed();
+      this.showPushBanner = perm === 'granted' && !subscribed;
+    } else {
+      // 'default' — never asked
+      this.showPushBanner = !this.wasDismissedRecently(this.PUSH_BANNER_DISMISSED_KEY);
+    }
+  }
+
+  async enablePush() {
+    const result = await this.pushNotifications.enable();
+    if (result === 'ok') {
+      this.showPushBanner = false;
+      this.showToast('Notificaciones activadas.', 'success');
+    } else if (result === 'denied') {
+      this.showToast('Permiso denegado. Actívalas desde los ajustes del navegador.', 'warning');
+      this.showPushBanner = false;
+    } else if (result === 'unsupported') {
+      this.showToast('Tu navegador no soporta notificaciones push todavía.', 'warning');
+      this.showPushBanner = false;
+    } else {
+      this.showToast('No se pudo activar. Intenta más tarde.', 'danger');
+    }
+  }
+
+  dismissPushBanner() {
+    this.showPushBanner = false;
+    localStorage.setItem(this.PUSH_BANNER_DISMISSED_KEY, String(Date.now()));
+  }
+
+  private isStandalone(): boolean {
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true
+    );
+  }
+
+  private isIosSafari(): boolean {
+    const ua = navigator.userAgent;
+    const iOS = /iPad|iPhone|iPod/.test(ua);
+    const webkit = /WebKit/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+    return iOS && webkit;
+  }
+
+  /** Suppress a dismissed banner for 3 days so it doesn't keep bothering the user. */
+  private wasDismissedRecently(key: string): boolean {
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const at = Number(raw);
+    if (isNaN(at)) return false;
+    return Date.now() - at < 3 * 24 * 60 * 60 * 1000;
   }
 
   goToAdmin() {
@@ -334,6 +454,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
             await loading.present();
 
             try {
+              await this.pushNotifications.disable();
               this.providerWorkspace.clearAll();
               this.auth.logout();
               this.websocket.disconnect();

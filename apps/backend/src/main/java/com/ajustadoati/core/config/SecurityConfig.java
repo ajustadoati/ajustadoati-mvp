@@ -44,7 +44,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
                 // Endpoints públicos
-                .requestMatchers("/auth/**", "/categories", "/providers/public-search", "/guest-requests/**", "/swagger-ui/**", "/api-docs/**", "/ws/**", "/ws-native/**", "/actuator/**").permitAll()
+                .requestMatchers("/auth/**", "/categories", "/providers/public-search", "/providers/push-config", "/guest-requests/**", "/swagger-ui/**", "/api-docs/**", "/ws/**", "/ws-native/**", "/actuator/**").permitAll()
                 // Endpoints protegidos
                 .requestMatchers("/profiles/**", "/providers/**").authenticated()
                 .anyRequest().authenticated()

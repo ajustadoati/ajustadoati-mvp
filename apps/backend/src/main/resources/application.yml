@@ -45,6 +45,15 @@ app:
     # Get one at https://resend.com — free tier is 100 emails/day.
     api-key: ${RESEND_API_KEY:}
     from: ${RESEND_FROM:AjustadoATi <onboarding@resend.dev>}
+  webpush:
+    # VAPID keys for Web Push. Generate once with any web-push CLI and keep
+    # the same pair forever — rotating them invalidates every provider's
+    # subscription. If either is empty, Web Push is disabled and the app
+    # falls back to WebSocket-only delivery.
+    vapid:
+      public-key: ${VAPID_PUBLIC_KEY:}
+      private-key: ${VAPID_PRIVATE_KEY:}
+      subject: ${VAPID_SUBJECT:mailto:richardroj@gmail.com}
 
 # JWT Configuration
 jwt:
