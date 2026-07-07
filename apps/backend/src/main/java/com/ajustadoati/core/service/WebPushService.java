@@ -79,11 +79,22 @@ public class WebPushService {
 
         String payload;
         try {
+            // Angular's SwPush expects a top-level "notification" object; without
+            // that wrapper the service worker doesn't call showNotification() and
+            // iOS silently drops the push. Keep the "data.url" so the click
+            // handler in the frontend knows where to route.
+            String targetUrl = url == null ? "/provider/home" : url;
             payload = objectMapper.writeValueAsString(Map.of(
-                    "title", title,
-                    "body", body,
-                    "url", url == null ? "/provider/home" : url,
-                    "tag", "ajustadoati"
+                    "notification", Map.of(
+                            "title", title,
+                            "body", body,
+                            "icon", "/assets/icons/icon-192.png",
+                            "badge", "/assets/icons/icon-192.png",
+                            "tag", "ajustadoati",
+                            "renotify", true,
+                            "requireInteraction", false,
+                            "data", Map.of("url", targetUrl)
+                    )
             ));
         } catch (Exception e) {
             log.error("[WEBPUSH] fallo serializando payload", e);
