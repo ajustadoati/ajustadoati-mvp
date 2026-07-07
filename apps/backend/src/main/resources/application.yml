@@ -122,6 +122,11 @@ spring:
       ddl-auto: validate
     show-sql: false
 
+# Logging: INFO for our own packages so operational markers ([PETICION],
+# [BUSQUEDA-PROVEEDORES], [FILTRO], [WEBPUSH], [EMAIL-ADMIN]…) are visible
+# in production. Spring internals stay at WARN to keep noise down.
 logging:
   level:
-    com.ajustadoati.core: WARN
+    com.ajustadoati.core: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
