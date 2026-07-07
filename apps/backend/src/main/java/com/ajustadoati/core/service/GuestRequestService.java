@@ -427,43 +427,44 @@ public class GuestRequestService {
                 session.maxDistanceKm
         );
 
-        if (providerSessions.isEmpty()) {
-            log.info("[PETICION] {} → 0 proveedores conectados disponibles", session.id);
-            return 0;
-        }
-
-        WebSocketDto.OutgoingMessage providerMessage = WebSocketDto.OutgoingMessage.builder()
-                .id(System.currentTimeMillis())
-                .type("request")
-                .fromUser(session.guestRef)
-                .user(session.guestRef)
-                .message(session.message)
-                .latitude(BigDecimal.valueOf(session.latitude))
-                .longitude(BigDecimal.valueOf(session.longitude))
-                .categoryId(session.categoryId)
-                .categoryName(session.categoryName)
-                .requestId(session.id)
-                .timestamp(LocalDateTime.now())
-                .build();
-
         int successfulSends = 0;
-        for (WebSocketSession providerSession : providerSessions) {
-            if (sendMessageToSession(providerSession, providerMessage)) {
-                successfulSends++;
-                log.info("[ENVIADO] peticion {} → session={}", session.id,
-                        providerSession.getId().substring(0, 8));
-            } else {
-                log.warn("[ERROR-ENVIO] peticion {} → session={} falló",
-                        session.id, providerSession.getId().substring(0, 8));
-            }
-        }
 
-        log.info("[PETICION] {} → notificados {}/{} proveedores",
-                session.id, successfulSends, providerSessions.size());
+        if (providerSessions.isEmpty()) {
+            log.info("[PETICION] {} → 0 proveedores conectados por WebSocket", session.id);
+        } else {
+            WebSocketDto.OutgoingMessage providerMessage = WebSocketDto.OutgoingMessage.builder()
+                    .id(System.currentTimeMillis())
+                    .type("request")
+                    .fromUser(session.guestRef)
+                    .user(session.guestRef)
+                    .message(session.message)
+                    .latitude(BigDecimal.valueOf(session.latitude))
+                    .longitude(BigDecimal.valueOf(session.longitude))
+                    .categoryId(session.categoryId)
+                    .categoryName(session.categoryName)
+                    .requestId(session.id)
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            for (WebSocketSession providerSession : providerSessions) {
+                if (sendMessageToSession(providerSession, providerMessage)) {
+                    successfulSends++;
+                    log.info("[ENVIADO] peticion {} → session={}", session.id,
+                            providerSession.getId().substring(0, 8));
+                } else {
+                    log.warn("[ERROR-ENVIO] peticion {} → session={} falló",
+                            session.id, providerSession.getId().substring(0, 8));
+                }
+            }
+
+            log.info("[PETICION] {} → notificados {}/{} proveedores por WebSocket",
+                    session.id, successfulSends, providerSessions.size());
+        }
 
         // Fire Web Push to any nearby provider that ISN'T currently connected
         // by WebSocket — they wouldn't otherwise learn about the request until
-        // they next open the app.
+        // they next open the app. This runs regardless of whether any WS
+        // session was found, so an empty online list is not a dead end.
         try {
             notifyOfflineProvidersByPush(session);
         } catch (Exception e) {
@@ -474,9 +475,14 @@ public class GuestRequestService {
     }
 
     private void notifyOfflineProvidersByPush(GuestRequestSession session) {
-        if (!webPushService.isEnabled()) return;
+        if (!webPushService.isEnabled()) {
+            log.info("[WEBPUSH] deshabilitado (VAPID no configurado)");
+            return;
+        }
         List<Object[]> nearby = profileRepository.findNearbyProviders(
                 session.categoryId, session.latitude, session.longitude, session.maxDistanceKm);
+
+        int offlineNearby = 0;
         int pushed = 0;
         for (Object[] row : nearby) {
             java.util.UUID profileId = row[0] instanceof java.util.UUID u
@@ -485,6 +491,7 @@ public class GuestRequestService {
             if (email != null && connectionRegistry.isUserConnected(email)) {
                 continue; // Ya recibió por WebSocket
             }
+            offlineNearby++;
             int delivered = webPushService.sendToUser(
                     profileId,
                     "Nueva solicitud: " + session.categoryName,
@@ -492,10 +499,8 @@ public class GuestRequestService {
                     "/provider/home");
             if (delivered > 0) pushed++;
         }
-        if (pushed > 0) {
-            log.info("[WEBPUSH] peticion {} → {} proveedores offline notificados por push",
-                    session.id, pushed);
-        }
+        log.info("[WEBPUSH] peticion {} → nearby={} offline={} pushed={} (pushed=0 y offline>0 ⇒ ningún proveedor tiene suscripción de push activa)",
+                session.id, nearby.size(), offlineNearby, pushed);
     }
 
     private boolean sendMessageToSession(WebSocketSession session, WebSocketDto.OutgoingMessage message) {
