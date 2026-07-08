@@ -231,6 +231,46 @@ public class GuestRequestService {
         return sessions.containsKey(requestId);
     }
 
+    /**
+     * Returns every active guest request that a given provider should still see
+     * in their dashboard. Used when the provider opens the app from a push
+     * notification: they need the backlog they couldn't receive via WebSocket
+     * because the app was closed at the time.
+     *
+     * A request is included when it matches the provider's categories, is
+     * within their radius, is not expired, and the provider hasn't already
+     * responded to it.
+     */
+    public List<GuestRequestDto> getPendingForProvider(
+            List<Integer> providerCategories,
+            String providerEmail,
+            Double providerLat,
+            Double providerLng) {
+        if (providerCategories == null || providerCategories.isEmpty()) {
+            return List.of();
+        }
+        List<GuestRequestDto> out = new ArrayList<>();
+        for (GuestRequestSession session : sessions.values()) {
+            if ("expired".equals(session.status) || "accepted".equals(session.status)) {
+                continue;
+            }
+            if (!providerCategories.contains(session.categoryId)) {
+                continue;
+            }
+            if (providerLat != null && providerLng != null) {
+                double distance = calculateDistance(
+                        providerLat, providerLng, session.latitude, session.longitude);
+                if (distance > session.maxDistanceKm) continue;
+            }
+            boolean alreadyResponded = providerEmail != null && session.responses.stream()
+                    .anyMatch(r -> providerEmail.equalsIgnoreCase(r.providerEmail()));
+            if (alreadyResponded) continue;
+            out.add(toDto(session));
+        }
+        out.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
+        return out;
+    }
+
     public int acceptResponse(UUID requestId, UUID responseId) {
         GuestRequestSession session = sessions.get(requestId);
         if (session == null) {
@@ -405,6 +445,17 @@ public class GuestRequestService {
                 .toList();
     }
 
+    /** Haversine distance in kilometres between two lat/lng points. */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     public List<com.ajustadoati.core.dto.AdminDto.DemoRequestSummary> getDemoRequests() {
         return sessions.values().stream()
                 .filter(s -> s.demo)
@@ -499,8 +550,13 @@ public class GuestRequestService {
                     "/provider/home");
             if (delivered > 0) pushed++;
         }
-        log.info("[WEBPUSH] peticion {} → nearby={} offline={} pushed={} (pushed=0 y offline>0 ⇒ ningún proveedor tiene suscripción de push activa)",
-                session.id, nearby.size(), offlineNearby, pushed);
+        if (pushed == 0 && offlineNearby > 0) {
+            log.info("[WEBPUSH] peticion {} → nearby={} offline={} pushed=0 ⚠️ ningún proveedor tiene suscripción de push activa",
+                    session.id, nearby.size(), offlineNearby);
+        } else {
+            log.info("[WEBPUSH] peticion {} → nearby={} offline={} pushed={}",
+                    session.id, nearby.size(), offlineNearby, pushed);
+        }
     }
 
     private boolean sendMessageToSession(WebSocketSession session, WebSocketDto.OutgoingMessage message) {

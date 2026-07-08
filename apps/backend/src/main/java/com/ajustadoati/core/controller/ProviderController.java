@@ -1,6 +1,9 @@
 package com.ajustadoati.core.controller;
 
 import com.ajustadoati.core.dto.CommonDto.*;
+import com.ajustadoati.core.entity.Profile;
+import com.ajustadoati.core.repository.ProfileRepository;
+import com.ajustadoati.core.service.GuestRequestService;
 import com.ajustadoati.core.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -10,9 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/providers")
@@ -22,7 +27,36 @@ import java.util.List;
 public class ProviderController {
     
     private final ProfileService profileService;
+    private final GuestRequestService guestRequestService;
+    private final ProfileRepository profileRepository;
     
+    /**
+     * Returns the guest-request backlog the current provider still needs to
+     * see: matches by category and location, not expired, not already
+     * answered by this provider. Called when the provider opens the app
+     * from a push notification so their dashboard is not empty.
+     */
+    @GetMapping("/pending-requests")
+    public ResponseEntity<ApiResponse<List<GuestRequestDto>>> getPendingRequests(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("No autenticado"));
+        }
+        Optional<Profile> profileOpt = profileRepository.findByUsernameOrEmailWithCategories(
+                authentication.getName(), authentication.getName());
+        if (profileOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Perfil no encontrado"));
+        }
+        Profile profile = profileOpt.get();
+        Double lat = profile.getLocation() != null && profile.getLocation().getLatitude() != null
+                ? profile.getLocation().getLatitude().doubleValue() : null;
+        Double lng = profile.getLocation() != null && profile.getLocation().getLongitude() != null
+                ? profile.getLocation().getLongitude().doubleValue() : null;
+
+        List<GuestRequestDto> pending = guestRequestService.getPendingForProvider(
+                profile.getCategories(), profile.getEmail(), lat, lng);
+        return ResponseEntity.ok(ApiResponse.success(pending));
+    }
+
     @GetMapping("/search")
     @Operation(summary = "Search nearby providers", description = "Find service providers by category and location with distance filtering")
     @ApiResponses(value = {

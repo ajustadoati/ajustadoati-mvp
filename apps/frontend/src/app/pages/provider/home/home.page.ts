@@ -220,6 +220,12 @@ export class ProviderHomePage implements OnInit, OnDestroy {
       // provider would see ghost pending requests and sent responses.
       this.providerWorkspace.ensureBelongsTo(this.user?.email);
       console.log('👤 Provider profile loaded:', this.user);
+
+      // Pull the backlog of guest requests that already matched us but
+      // couldn't reach us over WebSocket (app was closed). Without this,
+      // opening the app from a push notification lands on an empty
+      // dashboard.
+      void this.providerWorkspace.fetchPendingBacklog();
     } catch (error) {
       console.error('Error loading provider profile:', error);
     }

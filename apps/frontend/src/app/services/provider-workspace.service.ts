@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import {
   IncomingWebSocketMessage,
   ServiceRequest
@@ -9,6 +10,20 @@ import {
   JobStatus,
   ProviderActiveJob
 } from '../interfaces/request.interface';
+import { environment } from '../../environments/environment';
+
+interface BackendGuestRequest {
+  id: string;
+  guestRef: string;
+  categoryId: number;
+  categoryName: string;
+  message: string;
+  latitude: number;
+  longitude: number;
+  maxDistanceKm: number;
+  status: string;
+  createdAt: string;
+}
 
 export type ProviderResponseStatus = 'sent' | 'accepted' | 'expired';
 
@@ -45,11 +60,45 @@ export class ProviderWorkspaceService {
   sentResponses$ = this.sentResponsesSubject.asObservable();
   activeJob$ = this.activeJobSubject.asObservable();
 
+  private http = inject(HttpClient);
+
   constructor() {
     // Drop stale requests persisted in localStorage (provider may have been
     // offline when the backend broadcast the expiration), then keep pruning.
     this.pruneExpiredRequests();
     setInterval(() => this.pruneExpiredRequests(), 60000);
+  }
+
+  /**
+   * Pulls the backlog of requests the provider missed while offline (e.g.
+   * they opened the app from a push notification). Must be called at
+   * provider/home mount, after the workspace is bound to the current user.
+   */
+  async fetchPendingBacklog(): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.http.get<any>(`${environment.baseUrl}/providers/pending-requests`)
+      );
+      const backlog: BackendGuestRequest[] = response?.data || [];
+      backlog.forEach(item => {
+        const request: ServiceRequest = {
+          id: Date.now(),
+          type: 'request',
+          fromUser: item.guestRef,
+          message: item.message,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          requestId: item.id,
+          timestamp: item.createdAt,
+          maxDistanceKm: item.maxDistanceKm
+        };
+        this.addIncomingRequest(request);
+      });
+    } catch (err) {
+      console.warn('Failed to fetch pending request backlog:', err);
+    }
   }
 
   /**
