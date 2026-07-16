@@ -35,16 +35,12 @@ public class GuestRequestService {
     private final CategoryRepository categoryRepository;
     private final ProfileRepository profileRepository;
     private final ObjectMapper objectMapper;
-    private final ResendEmailService emailService;
     private final WebPushService webPushService;
 
     private final Map<UUID, GuestRequestSession> sessions = new ConcurrentHashMap<>();
 
     @Value("${app.requests.expiration-minutes:15}")
     private long expirationMinutes;
-
-    @Value("${app.admin.emails:}")
-    private List<String> adminEmails;
 
     @Value("${app.admin.responder.name:AjustadoATi}")
     private String adminResponderName;
@@ -127,50 +123,7 @@ public class GuestRequestService {
         session.updatedAt = LocalDateTime.now();
         sessions.put(requestId, session);
 
-        // Fire-and-forget email to admin so they know a curious guest just searched
-        // and can reply from the backoffice if no real provider does.
-        try {
-            notifyAdminByEmail(session);
-        } catch (Exception e) {
-            log.warn("[EMAIL-ADMIN] fallo notificando admin de peticion {}", requestId, e);
-        }
-
         return toDto(session);
-    }
-
-    private void notifyAdminByEmail(GuestRequestSession session) {
-        if (adminEmails == null || adminEmails.isEmpty()) {
-            return;
-        }
-        String subject = String.format("[AjustadoATi] Nueva búsqueda: %s", session.categoryName);
-        String html = String.format(
-                "<div style=\"font-family:-apple-system,Roboto,sans-serif;padding:16px;max-width:520px;\">" +
-                        "<h2 style=\"margin:0 0 12px;color:#0f172a;\">Nueva búsqueda de un cliente</h2>" +
-                        "<p style=\"margin:0 0 6px;color:#334155;\">" +
-                        "<strong>Categoría:</strong> %s</p>" +
-                        "<p style=\"margin:0 0 6px;color:#334155;\">" +
-                        "<strong>Mensaje:</strong> %s</p>" +
-                        "<p style=\"margin:0 0 6px;color:#64748b;font-size:13px;\">" +
-                        "Ubicación: %.4f, %.4f · Proveedores notificados: %d</p>" +
-                        "<p style=\"margin:20px 0 0;\">" +
-                        "<a href=\"https://ajustadoati.com/admin\" style=\"display:inline-block;padding:10px 18px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;\">" +
-                        "Ver en el backoffice</a></p>" +
-                        "<p style=\"margin:18px 0 0;font-size:12px;color:#94a3b8;\">La solicitud caduca en %d min.</p>" +
-                        "</div>",
-                escapeHtml(session.categoryName),
-                escapeHtml(session.message),
-                session.latitude, session.longitude,
-                session.notifiedProviders != null ? session.notifiedProviders : 0,
-                expirationMinutes);
-        for (String email : adminEmails) {
-            emailService.send(email.trim(), subject, html);
-        }
-    }
-
-    private String escapeHtml(String value) {
-        if (value == null) return "";
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     /**

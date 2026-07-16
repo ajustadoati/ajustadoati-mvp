@@ -74,29 +74,7 @@ ADMIN_RESPONDER_PHONE=+34632624665
 del cliente. Cambia el env var y redeploy si quieres redirigir esos
 contactos a otro número.
 
-## 4. Email al admin cuando llega una búsqueda (Resend directo desde el backend)
-
-Cuando un guest crea una solicitud, el backend envía un email a cada
-dirección de `app.admin.emails` con un botón "Ver en el backoffice".
-Necesita una cuenta de Resend (gratis, 100 emails/día):
-
-1. https://resend.com/register → crea cuenta con `richardroj@gmail.com`.
-2. **API Keys** → **Create API Key** → copia la clave (empieza por `re_`).
-3. En el VPS, exporta la variable antes de arrancar el backend:
-
-```bash
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
-RESEND_FROM="AjustadoATi <onboarding@resend.dev>"
-```
-
-`onboarding@resend.dev` es el remitente sandbox de Resend; funciona sin
-verificar dominio. Para producción real, verifica `ajustadoati.com` en
-Resend y cambia `RESEND_FROM` a `AjustadoATi <no-reply@ajustadoati.com>`.
-
-Si `RESEND_API_KEY` está vacío (default), el envío es silencioso — no
-rompe nada, sólo no llegan los emails.
-
-## 4.1 Web Push a proveedores (PWA)
+## 4. Web Push a proveedores (PWA)
 
 Los proveedores pueden instalar AjustadoATi como PWA en su móvil y recibir
 notificaciones nativas cuando llega una solicitud aunque la app esté

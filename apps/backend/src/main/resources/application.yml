@@ -40,11 +40,6 @@ app:
   requests:
     # Minutes before an active request expires and stops being visible to providers
     expiration-minutes: ${REQUEST_EXPIRATION_MINUTES:15}
-  resend:
-    # Resend API key (leave empty to disable email notifications completely).
-    # Get one at https://resend.com — free tier is 100 emails/day.
-    api-key: ${RESEND_API_KEY:}
-    from: ${RESEND_FROM:AjustadoATi <onboarding@resend.dev>}
   webpush:
     # VAPID keys for Web Push. Generate once with any web-push CLI and keep
     # the same pair forever — rotating them invalidates every provider's
