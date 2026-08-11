@@ -432,7 +432,23 @@ export class SearchRequestService {
         }
 
         const newResponses = this.mapGuestResponses(guestRequest.responses || []);
-        this.currentSearchSession$.next({ ...sessionAfterFetch, responses: newResponses });
+        const nextSession: SearchSession = {
+          ...sessionAfterFetch,
+          responses: newResponses,
+          notifiedProvidersCount: guestRequest.notifiedProviders || sessionAfterFetch.notifiedProvidersCount || 0
+        };
+
+        if (!this.hasGuestSessionChanged(sessionAfterFetch, nextSession, guestRequest.status)) {
+          return;
+        }
+
+        this.currentSearchSession$.next({
+          ...nextSession,
+          searchRequest: {
+            ...nextSession.searchRequest,
+            status: this.mapGuestRequestStatus(guestRequest.status, nextSession.searchRequest.status)
+          }
+        });
       } catch (error) {
         console.error('❌ Error polling guest responses:', error);
       }
@@ -460,6 +476,63 @@ export class SearchRequestService {
       timestamp: new Date(response.createdAt),
       providerPhone: response.providerPhone
     }));
+  }
+
+  private hasGuestSessionChanged(currentSession: SearchSession, nextSession: SearchSession, backendStatus?: string): boolean {
+    if ((currentSession.notifiedProvidersCount || 0) !== (nextSession.notifiedProvidersCount || 0)) {
+      return true;
+    }
+
+    const mappedStatus = this.mapGuestRequestStatus(backendStatus, currentSession.searchRequest.status);
+    if (mappedStatus !== currentSession.searchRequest.status) {
+      return true;
+    }
+
+    const currentResponses = currentSession.responses || [];
+    const nextResponses = nextSession.responses || [];
+
+    if (currentResponses.length !== nextResponses.length) {
+      return true;
+    }
+
+    for (let index = 0; index < nextResponses.length; index += 1) {
+      const current = currentResponses[index];
+      const next = nextResponses[index];
+
+      if (!current || !next) {
+        return true;
+      }
+
+      if (
+        current.id !== next.id ||
+        current.message !== next.message ||
+        current.providerPhone !== next.providerPhone ||
+        current.providerName !== next.providerName ||
+        current.latitude !== next.latitude ||
+        current.longitude !== next.longitude ||
+        current.timestamp.getTime() !== next.timestamp.getTime()
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private mapGuestRequestStatus(status: string | undefined, fallback: SearchRequest['status']): SearchRequest['status'] {
+    switch ((status || '').toLowerCase()) {
+      case 'accepted':
+        return 'accepted';
+      case 'completed':
+        return 'completed';
+      case 'timeout':
+      case 'expired':
+        return 'timeout';
+      case 'pending':
+        return 'pending';
+      default:
+        return fallback;
+    }
   }
 
   /**
