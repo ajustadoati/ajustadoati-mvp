@@ -9,7 +9,6 @@ import { BackendAuthService, BackendUserInfo } from '../../../services/backend-a
 import { HybridGeolocationService, Position } from '../../../services/hybrid-geolocation.service';
 import { AjustadoAtiWebSocketService } from '../../../services/ajustadoati-websocket.service';
 import { SearchRequestService, SearchSession } from '../../../services/search-request.service';
-import { CategoryService, Category } from '../../../services/category.service';
 import { UserRequestService } from '../../../services/user-request.service';
 
 @Component({
@@ -28,8 +27,7 @@ export class HomePage implements OnInit, OnDestroy {
   currentSearchSession: SearchSession | null = null;
   serviceForm: FormGroup;
 
-  serviceCategories: Category[] = [];
-  loadingCategories = false;
+  searchErrorMessage = "";
 
   private subscriptions: Subscription[] = [];
 
@@ -45,12 +43,10 @@ export class HomePage implements OnInit, OnDestroy {
     private geolocation: HybridGeolocationService,
     private websocket: AjustadoAtiWebSocketService,
     private searchService: SearchRequestService,
-    private categoryService: CategoryService,
     private userRequestService: UserRequestService
   ) {
     this.serviceForm = this.fb.group({
-      category: ['', Validators.required],
-      serviceDescription: ['', [Validators.required, Validators.minLength(5)]]
+      serviceDescription: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(1000)]]
     });
   }
 
@@ -60,13 +56,9 @@ export class HomePage implements OnInit, OnDestroy {
     // Load user profile
     await this.loadUserProfile();
     
-    // Load categories from backend
-    await this.loadCategories();
 
     this.applyPrefillFromRoute();
     
-    // Initialize location services
-    await this.initializeLocation();
     
     // Initialize WebSocket connection
     await this.initializeWebSocket();
@@ -101,36 +93,6 @@ export class HomePage implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
-  }
-
-  private async loadCategories() {
-    this.loadingCategories = true;
-    try {
-      console.log('📋 Loading categories from backend...');
-      const categories = await this.categoryService.getCategories().toPromise();
-      
-      this.serviceCategories = categories || [];
-      
-      console.log('✅ Categories loaded from backend:', this.serviceCategories.length);
-    } catch (error) {
-      console.error('❌ Error loading categories from backend:', error);
-      // Fallback to default categories if backend fails
-      this.serviceCategories = this.getFallbackCategories();
-      await this.showToast('Error al cargar categorías, usando categorías por defecto', 'warning');
-    } finally {
-      this.loadingCategories = false;
-    }
-  }
-
-  private getFallbackCategories(): Category[] {
-    return [
-      { id: 1, name: 'Electrónicos', description: 'Dispositivos electrónicos' },
-      { id: 2, name: 'Electrodomésticos', description: 'Electrodomésticos del hogar' },
-      { id: 3, name: 'Automotriz', description: 'Servicios automotrices' },
-      { id: 4, name: 'Hogar', description: 'Servicios para el hogar' },
-      { id: 5, name: 'Tecnología', description: 'Servicios tecnológicos' },
-      { id: 6, name: 'Otros', description: 'Otros servicios' }
-    ];
   }
 
   private async initializeLocation() {
@@ -176,16 +138,11 @@ export class HomePage implements OnInit, OnDestroy {
 
   private applyPrefillFromRoute() {
     const description = this.route.snapshot.queryParamMap.get('description');
-    const categoryId = this.route.snapshot.queryParamMap.get('categoryId');
 
     if (description) {
       this.serviceForm.patchValue({ serviceDescription: description });
     }
 
-    if (categoryId) {
-      const selectedCategory = this.serviceCategories.find(category => category.id.toString() === categoryId);
-      this.serviceForm.patchValue({ category: selectedCategory?.id || categoryId });
-    }
   }
 
   private async initializeWebSocket() {
@@ -218,14 +175,16 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   async onServiceSubmit() {
+    if (this.isLoading || this.isLocationLoading) return;
+    this.searchErrorMessage = "";
     if (this.serviceForm.invalid) {
       await this.showToast('Por favor completa todos los campos', 'warning');
       return;
     }
 
     if (!this.currentPosition) {
-      await this.showLocationRequiredAlert();
-      return;
+      await this.initializeLocation();
+      if (!this.currentPosition) return;
     }
 
     if (this.searchService.hasActiveSearch()) {
@@ -233,12 +192,11 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
 
-    const { category, serviceDescription } = this.serviceForm.value;
-
-    await this.performServiceSearch(category.toString(), serviceDescription);
+    const { serviceDescription } = this.serviceForm.value;
+    await this.performServiceSearch(serviceDescription);
   }
 
-  private async performServiceSearch(categoryId: string, description: string) {
+  private async performServiceSearch(description: string) {
     if (!this.currentPosition) {
       await this.showToast('Ubicación requerida para buscar proveedores', 'danger');
       return;
@@ -252,19 +210,13 @@ export class HomePage implements OnInit, OnDestroy {
         lng: this.currentPosition.longitude
       };
 
-      // Get category name
-      const category = this.serviceCategories.find(c => c.id.toString() === categoryId);
-      const categoryName = category?.name || 'Servicio';
-
-      const session = await this.searchService.createSearchRequest(
-        description,
-        categoryId,
-        userLocation,
-        categoryName
-      );
+      const session = await this.searchService.createSearchRequest(description, userLocation);
+      const categoryId = session.searchRequest.categoryId;
+      const categoryName = session.searchRequest.categoryName || 'Servicio';
 
       // Also create in UserRequestService for persistence
       await this.userRequestService.createRequest({
+        id: session.searchRequest.id,
         categoryId,
         categoryName,
         description,
@@ -276,18 +228,17 @@ export class HomePage implements OnInit, OnDestroy {
       });
 
       if (session.providers.length > 0) {
-        await this.showToast(`Búsqueda iniciada. ${session.providers.length} proveedores notificados.`, 'success');
+        await this.showToast(`Búsqueda iniciada. ${session.notifiedProvidersCount || 0} proveedores notificados.`, 'success');
 
         // Clear form and navigate to waiting-responses
-        this.serviceForm.reset({ serviceDescription: '', category: '' });
+        this.serviceForm.reset({ serviceDescription: '' });
         this.router.navigate(['/user/waiting-responses']);
       } else {
         await this.showNoProvidersAlert();
       }
 
-    } catch (error) {
-      console.error('Search error:', error);
-      await this.showToast('Error al buscar proveedores. Inténtalo de nuevo.', 'danger');
+    } catch (error: any) {
+      this.searchErrorMessage = error?.message || 'No se pudo realizar la busqueda. Intenta de nuevo.';
     } finally {
       this.isLoading = false;
     }

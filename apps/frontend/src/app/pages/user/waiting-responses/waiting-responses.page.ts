@@ -173,6 +173,9 @@ ${response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : 
 
   private async confirmAcceptOffer(response: ProviderResponse) {
     try {
+      if (this.currentSession?.serverManaged) {
+        await this.searchService.acceptGuestResponse(response.requestId, response.id);
+      }
       // Accept in SearchRequestService
       this.searchService.acceptProviderResponse(response.id);
 
@@ -195,7 +198,7 @@ ${response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : 
 
       const activeRequest = this.userRequestService.getCurrentActiveRequest();
       if (activeRequest) {
-        await this.userRequestService.acceptOffer(activeRequest.id, offer);
+        await this.userRequestService.acceptOffer(activeRequest.id, offer, !this.currentSession?.serverManaged);
       }
 
       await this.showToast('Oferta aceptada! El proveedor ha sido notificado.', 'success');

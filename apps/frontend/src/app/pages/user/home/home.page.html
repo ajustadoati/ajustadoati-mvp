@@ -46,31 +46,6 @@
 
     <!-- Form -->
     <form class="form" [formGroup]="serviceForm" (ngSubmit)="onServiceSubmit()">
-      <!-- Categoría -->
-      <div class="field">
-        <label class="field-label">Categoría</label>
-        <ion-select
-          formControlName="category"
-          interface="action-sheet"
-          [interfaceOptions]="{ header: 'Categoría del servicio' }"
-          placeholder="Selecciona una categoría"
-          [disabled]="loadingCategories || serviceCategories.length === 0"
-          class="select-control"
-          cancelText="Cancelar"
-        >
-          <ion-select-option
-            *ngFor="let category of serviceCategories"
-            [value]="category.id"
-          >
-            {{ category.name }}
-          </ion-select-option>
-        </ion-select>
-        <div class="field-loading" *ngIf="loadingCategories">
-          <ion-spinner name="crescent"></ion-spinner>
-          <span>Cargando categorías…</span>
-        </div>
-      </div>
-
       <!-- Descripción -->
       <div class="field">
         <label class="field-label">¿Qué necesitas?</label>
@@ -99,17 +74,19 @@
         </button>
       </div>
 
+      <p *ngIf="searchErrorMessage" role="alert">{{ searchErrorMessage }}</p>
+      <p>Al buscar usaremos tu ubicacion para avisar a proveedores cercanos.</p>
       <!-- Submit -->
       <ion-button
         expand="block"
         type="submit"
         class="submit-button"
-        [disabled]="serviceForm.invalid || isLoading || !currentPosition"
+        [disabled]="serviceForm.invalid || isLoading || isLocationLoading"
       >
         <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
         <ion-icon name="search-outline" slot="start" *ngIf="!isLoading"></ion-icon>
         <span *ngIf="!isLoading">Buscar Proveedores</span>
-        <span *ngIf="isLoading">Buscando…</span>
+        <span *ngIf="isLoading">Interpretando tu solicitud…</span>
       </ion-button>
     </form>
   </div>

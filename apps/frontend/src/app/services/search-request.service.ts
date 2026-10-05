@@ -43,6 +43,7 @@ export interface SearchSession {
   providers: ProviderSearchResult[]; // Lista de proveedores obtenidos del backend
   acceptedResponse?: ProviderResponse; // The accepted provider response
   isGuestSearch?: boolean;
+  serverManaged?: boolean;
   notifiedProvidersCount?: number;
 }
 
@@ -110,178 +111,65 @@ export class SearchRequestService {
   /**
    * Crear una nueva búsqueda desde la app/web
    */
-  async createSearchRequest(productName: string, categoryId: string, userLocation: {lat: number, lng: number}, categoryName?: string, isGuestSearch = false): Promise<SearchSession> {
+  private pendingSubmission: { signature: string; id: string } | null = null;
+  private submissionInFlight: Promise<SearchSession> | null = null;
+
+  async createSearchRequest(productName: string, userLocation: {lat: number, lng: number}, isGuestSearch = false): Promise<SearchSession> {
+    if (this.submissionInFlight) return this.submissionInFlight;
+    const message = productName.trim();
+    const signature = JSON.stringify([message, userLocation, isGuestSearch]);
+    if (this.pendingSubmission?.signature !== signature) {
+      this.pendingSubmission = { signature, id: crypto.randomUUID() };
+    }
+    const operation = this.submitSearch(message, userLocation, isGuestSearch, this.pendingSubmission!.id);
+    this.submissionInFlight = operation;
     try {
-      // 1. Crear el objeto de búsqueda
-      const searchRequest: SearchRequest = {
-        id: this.generateRequestId(),
-        productName,
-        categoryId,
-        categoryName,
-        userLatitude: userLocation.lat,
-        userLongitude: userLocation.lng,
-        timestamp: new Date(),
-        status: 'pending'
-      };
-
-      // 2. Obtener lista de proveedores del backend
-      const providers = await this.getProvidersForCategory(categoryId, userLocation.lat, userLocation.lng, isGuestSearch);
-      console.log(`✅ Found ${providers.length} providers for category ${categoryId}`);
-
-      // 3. Crear sesión de búsqueda
-      const searchSession: SearchSession = {
-        searchRequest,
-        responses: [],
-        isActive: true,
-        providers,
-        isGuestSearch
-      };
-
-      if (isGuestSearch) {
-        const guestRequest = await this.createGuestRequestOnBackend(searchRequest);
-        searchRequest.id = guestRequest.id;
-        searchSession.responses = this.mapGuestResponses(guestRequest.responses || []);
-        searchSession.notifiedProvidersCount = guestRequest.notifiedProviders || 0;
-        this.currentSearchSession$.next(searchSession);
-        this.startGuestResponsePolling(guestRequest.id);
-        return searchSession;
-      }
-
-      // 4. Guardar sesión actual
-      this.currentSearchSession$.next(searchSession);
-
-      // 5. Enviar petición via WebSocket
-      this.sendRequestToProviders(searchRequest);
-
-      // 6. Configurar timeout
-      this.setupSearchTimeout(searchRequest.id);
-
-      return searchSession;
-
-    } catch (error) {
-      console.error('❌ Error creating search request:', error);
-      throw error;
+      return await operation;
+    } finally {
+      this.submissionInFlight = null;
     }
   }
 
-  /**
-   * Obtener proveedores de una categoría usando el backend
-   */
-  private async getProvidersForCategory(categoryId: string, userLatitude?: number, userLongitude?: number, isGuestSearch = false): Promise<ProviderSearchResult[]> {
+  private async submitSearch(message: string, location: {lat: number, lng: number}, isGuestSearch: boolean, submissionId: string): Promise<SearchSession> {
     try {
-      console.log(`🔍 Searching providers in backend for category: ${categoryId}`);
-
-      // Si no hay ubicación del usuario, retornar array vacío
-      if (!userLatitude || !userLongitude) {
-        console.warn('⚠️ User location required for provider search');
-        return [];
-      }
-
-      const radiusKm = 50; // Radio de búsqueda en kilómetros
-
-      // Llamar al endpoint correcto del backend
-      const endpoint = isGuestSearch ? 'public-search' : 'search';
-      const response = await this.http.get<any>(
-        `${environment.baseUrl}/providers/${endpoint}`,
-        {
-          params: {
-            categoryId: categoryId,
-            latitude: userLatitude.toString(),
-            longitude: userLongitude.toString(),
-            maxDistanceKm: radiusKm.toString(),
-            page: '0',
-            size: '20'
-          }
-        }
-      ).toPromise();
-
-      if (!response.success || !response.data || !response.data.content) {
-        console.warn('Invalid response from backend:', response);
-        return [];
-      }
-
-      // Convertir respuesta del backend al formato esperado
-      const providers: ProviderSearchResult[] = response.data.content.map((provider: any) => ({
-        id: provider.id,
-        userId: provider.id,
-        name: provider.fullName || 'Proveedor',
-        email: provider.email || '',
-        phone: provider.phone || '',
-        businessName: provider.fullName,
-        description: 'Proveedor de servicios',
-        rating: 4.0,
-        totalReviews: 0,
-        isActive: provider.isActive ?? true,
-        isVerified: false,
-        categories: (provider.categories || []).map((catId: number) => ({
-          categoryId: catId.toString(),
-          categoryName: 'Servicio',
-          experience: 0
-        })),
-        locations: provider.location ? [{
-          address: provider.location.address || '',
-          latitude: provider.location.latitude,
-          longitude: provider.location.longitude,
-          serviceRadius: 10,
-          distance: provider.distanceKm
-        }] : [],
-        contact: {
-          phone: provider.phone || '',
-          whatsapp: provider.phone || undefined
-        },
-        pricing: undefined
+      const response = await firstValueFrom(this.http.post<any>(`${environment.baseUrl}/search-requests`, {
+        submissionId, message, latitude: location.lat, longitude: location.lng, maxDistanceKm: 50
       }));
-
-      console.log(`✅ Found ${providers.length} providers from backend`);
-      return providers;
+      if (!response?.success || !response.data?.request) throw new Error('Respuesta de busqueda no valida.');
+      const request: GuestRequestApiResponse = response.data.request;
+      const session: SearchSession = {
+        searchRequest: {
+          id: request.id, productName: request.message,
+          categoryId: String(request.categoryId), categoryName: request.categoryName,
+          userLatitude: request.latitude, userLongitude: request.longitude,
+          timestamp: new Date(request.createdAt), status: this.mapGuestRequestStatus(request.status, 'pending')
+        },
+        responses: this.mapGuestResponses(request.responses || []),
+        isActive: !['expired', 'completed', 'accepted'].includes(request.status),
+        providers: (response.data.providers || []).map((provider: any) => ({
+          id: provider.id, userId: provider.id, name: provider.fullName || 'Proveedor',
+          email: '', phone: '', businessName: provider.fullName, description: '',
+          rating: 0, totalReviews: 0, isActive: provider.isActive ?? true, isVerified: false,
+          categories: [{ categoryId: String(request.categoryId), categoryName: request.categoryName, experience: 0 }],
+          locations: provider.location ? [{
+            address: provider.location.address || '', latitude: provider.location.latitude,
+            longitude: provider.location.longitude, serviceRadius: 50, distance: provider.distanceKm
+          }] : [],
+          contact: { phone: '' }
+        })),
+        isGuestSearch,
+        serverManaged: true,
+        notifiedProvidersCount: request.notifiedProviders || 0
+      };
+      this.currentSearchSession$.next(session);
+      if (session.isActive) this.startGuestResponsePolling(request.id);
+      return session;
     } catch (error: any) {
-      console.error('❌ Error fetching providers from backend:', error);
-      const endpoint = isGuestSearch ? '/providers/public-search' : '/providers/search';
-
-      if (error.status === 0) {
-        console.error('Backend not reachable. Make sure it is running on', environment.baseUrl);
-        throw new Error('No se pudo conectar con el servidor. Verifica que el backend y el proxy esten activos.');
-      }
-
-      if (error.status === 404) {
-        throw new Error(`El endpoint ${endpoint} no existe en el backend activo. Reinicia Spring Boot para cargar los cambios mas recientes.`);
-      }
-
-      if (error.status === 401 || error.status === 403) {
-        throw new Error(`El backend bloqueo la ruta ${endpoint}. Revisa la configuracion de seguridad para la busqueda publica.`);
-      }
-
-      if (error.status >= 500) {
-        throw new Error(`El backend respondio con error ${error.status} al consultar ${endpoint}. Revisa el log del servidor.`);
-      }
-
-      throw new Error(`La busqueda fallo con estado ${error.status} al consultar ${endpoint}.`);
-    }
-  }
-
-  /**
-   * Enviar petición a proveedores via WebSocket
-   */
-  private sendRequestToProviders(searchRequest: SearchRequest): void {
-    try {
-      console.log('📤 Attempting to send service request via WebSocket');
-
-      // Enviar petición via WebSocket al backend
-      // El backend se encargará de distribuirla a los proveedores cercanos
-      this.websocketService.sendServiceRequest(
-        parseInt(searchRequest.categoryId),
-        searchRequest.productName,
-        searchRequest.userLatitude,
-        searchRequest.userLongitude,
-        50 // maxDistanceKm
-      );
-
-      console.log('✅ Service request sent successfully via WebSocket');
-    } catch (error: any) {
-      console.warn('⚠️ Could not send request via WebSocket:', error.message);
-      console.log('ℹ️ Guest users or users without WebSocket connection will only see provider list without real-time responses');
-      // No lanzar error - los usuarios invitados pueden ver la lista de proveedores
-      // pero no recibirán respuestas en tiempo real
+      // Keep the same submission ID after a network error: the server may already have published it.
+      if ([400, 401, 409, 422].includes(error.status)) this.pendingSubmission = null;
+      throw new Error(error.error?.message || (error.status === 0
+        ? 'No pudimos conectar. Tu texto se conserva; vuelve a intentarlo.'
+        : error.message || 'No se pudo realizar la busqueda. Intenta de nuevo.'));
     }
   }
 
@@ -290,7 +178,7 @@ export class SearchRequestService {
    */
   private handleProviderResponse(wsResponse: any): void {
     const currentSession = this.currentSearchSession$.value;
-    if (!currentSession || !currentSession.isActive) {
+    if (!currentSession || !currentSession.isActive || currentSession.serverManaged || wsResponse.requestId !== currentSession.searchRequest.id) {
       console.log('⚠️ No active search session for response');
       return;
     }
@@ -342,6 +230,7 @@ export class SearchRequestService {
    * Finalizar búsqueda activa
    */
   finishCurrentSearch(): void {
+    this.pendingSubmission = null;
     const currentSession = this.currentSearchSession$.value;
     if (currentSession) {
       currentSession.isActive = false;
@@ -358,6 +247,7 @@ export class SearchRequestService {
   }
 
   clearCurrentSession(): void {
+    this.pendingSubmission = null;
     this.currentSearchSession$.next(null);
 
     if (this.searchTimeout) {
@@ -381,23 +271,6 @@ export class SearchRequestService {
         console.log('Search request timed out:', requestId);
       }
     }, this.SEARCH_TIMEOUT);
-  }
-
-  private async createGuestRequestOnBackend(searchRequest: SearchRequest): Promise<GuestRequestApiResponse> {
-    const response = await firstValueFrom(this.http.post<any>(`${environment.baseUrl}/guest-requests`, {
-      message: searchRequest.productName,
-      categoryId: parseInt(searchRequest.categoryId, 10),
-      categoryName: searchRequest.categoryName,
-      latitude: searchRequest.userLatitude,
-      longitude: searchRequest.userLongitude,
-      maxDistanceKm: 50
-    }));
-
-    if (!response?.success || !response?.data) {
-      throw new Error('No se pudo crear la solicitud publica para invitados.');
-    }
-
-    return response.data as GuestRequestApiResponse;
   }
 
   private async fetchGuestRequestFromBackend(requestId: string): Promise<GuestRequestApiResponse> {
@@ -435,6 +308,7 @@ export class SearchRequestService {
         const nextSession: SearchSession = {
           ...sessionAfterFetch,
           responses: newResponses,
+          isActive: !['expired', 'completed', 'accepted'].includes(guestRequest.status),
           notifiedProvidersCount: guestRequest.notifiedProviders || sessionAfterFetch.notifiedProvidersCount || 0
         };
 
@@ -442,6 +316,9 @@ export class SearchRequestService {
           return;
         }
 
+        for (const response of newResponses) {
+          if (!sessionAfterFetch.responses.some(old => old.id === response.id)) this.incomingResponses$.next(response);
+        }
         this.currentSearchSession$.next({
           ...nextSession,
           searchRequest: {
@@ -470,6 +347,8 @@ export class SearchRequestService {
       providerName: response.providerName || 'Proveedor',
       providerEmail: response.providerEmail || '',
       message: response.message,
+      price: this.extractOfferNumber(response.message, /(?:\$|precio\s*:?\s*)(\d+(?:[.,]\d+)?)/i),
+      estimatedTime: this.extractOfferNumber(response.message, /(\d+)\s*min/i),
       accepted: true,
       latitude: response.latitude,
       longitude: response.longitude,
@@ -517,6 +396,11 @@ export class SearchRequestService {
     }
 
     return false;
+  }
+
+  private extractOfferNumber(message: string, pattern: RegExp): number | undefined {
+    const match = message.match(pattern);
+    return match ? Number(match[1].replace(',', '.')) : undefined;
   }
 
   private mapGuestRequestStatus(status: string | undefined, fallback: SearchRequest['status']): SearchRequest['status'] {

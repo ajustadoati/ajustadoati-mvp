@@ -35,6 +35,7 @@ export class UserRequestService {
    * Create a new service request
    */
   async createRequest(data: {
+    id?: string;
     categoryId: string;
     categoryName: string;
     description: string;
@@ -46,7 +47,7 @@ export class UserRequestService {
     const urgency = data.urgency ?? RequestUrgency.NOW;
 
     const request: UserServiceRequest = {
-      id: this.generateId(),
+      id: data.id || this.generateId(),
       userId,
       categoryId: data.categoryId,
       categoryName: data.categoryName,
@@ -71,7 +72,7 @@ export class UserRequestService {
   /**
    * Accept a provider's offer
    */
-  async acceptOffer(requestId: string, offer: ProviderOffer): Promise<void> {
+  async acceptOffer(requestId: string, offer: ProviderOffer, notifyViaWebSocket = true): Promise<void> {
     const activeRequest = this.activeRequest$.value;
 
     if (!activeRequest || activeRequest.id !== requestId) {
@@ -104,7 +105,7 @@ export class UserRequestService {
     this.saveToStorage();
 
     // Notify provider via WebSocket
-    this.sendOfferAcceptedNotification(offer);
+    if (notifyViaWebSocket) this.sendOfferAcceptedNotification(offer);
 
     console.log('✅ UserRequestService: Offer accepted', offer.id);
   }

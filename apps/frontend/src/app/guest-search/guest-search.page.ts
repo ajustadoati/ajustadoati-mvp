@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, AlertController, LoadingController, ToastController } from '@ionic/angular';
-import { Subscription, firstValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { addIcons } from 'ionicons';
 import {
   arrowBackOutline,
@@ -21,12 +21,10 @@ import {
   searchOutline,
   timeOutline
 } from 'ionicons/icons';
-import { CategoryService } from '../services/category.service';
 import { GeolocationService, UserLocation } from '../services/geolocation.service';
 import { SearchRequestService, SearchSession } from '../services/search-request.service';
 import { GuestUserService } from '../services/guest-user.service';
 import { AnalyticsService } from '../services/analytics.service';
-import { Category } from '../interfaces/category';
 
 declare const google: any;
 
@@ -38,8 +36,6 @@ declare const google: any;
   imports: [CommonModule, FormsModule, IonicModule]
 })
 export class GuestSearchPage implements OnInit, OnDestroy {
-  categories: Category[] = [];
-  selectedCategory: number | null = null;
   serviceDescription = '';
   isLoading = false;
   isLocationLoading = false;
@@ -60,7 +56,6 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
-    private categoryService: CategoryService,
     private geolocationService: GeolocationService,
     private searchRequestService: SearchRequestService,
     private guestUserService: GuestUserService,
@@ -89,7 +84,6 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
   async ngOnInit() {
     await this.ensureGuestUser();
-    await this.loadCategories();
     this.loadGuestStats();
     this.setupSearchSubscriptions();
   }
@@ -148,20 +142,6 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     this.guestStats = this.guestUserService.getGuestStats();
   }
 
-  async loadCategories() {
-    this.isLoading = true;
-
-    try {
-      this.categories = await firstValueFrom(this.categoryService.getCategories());
-    } catch (error) {
-      console.error('Error loading guest categories:', error);
-      this.categories = this.getFallbackCategories();
-      await this.showToast('Usando categorias basicas mientras conectamos con el servidor', 'warning');
-    } finally {
-      this.isLoading = false;
-    }
-  }
-
   openSearchModal() {
     this.isSearchModalOpen = true;
     this.modalStep = 'form';
@@ -207,12 +187,8 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   async onSearch() {
+    if (this.isLoading || this.isLocationLoading) return;
     this.searchErrorMessage = '';
-
-    if (!this.selectedCategory) {
-      await this.showAlert('Categoria requerida', 'Selecciona la categoria del servicio que necesitas.');
-      return;
-    }
 
     if (!this.serviceDescription.trim() || this.serviceDescription.trim().length < 3) {
       await this.showAlert('Descripcion requerida', 'Escribe que servicio o producto necesitas.');
@@ -233,18 +209,17 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   async startNewSearch() {
+    if (this.isLoading) return;
+    this.isLoading = true;
     const loading = await this.loadingController.create({
-      message: 'Buscando proveedores cercanos...'
+      message: 'Interpretando tu solicitud y buscando proveedores...'
     });
     await loading.present();
 
     try {
-      const category = this.categories.find(item => item.id === this.selectedCategory);
       const searchSession = await this.searchRequestService.createSearchRequest(
         this.serviceDescription.trim(),
-        this.selectedCategory!.toString(),
         { lat: this.userLocation!.lat, lng: this.userLocation!.lng },
-        category?.name || 'Servicio',
         true
       );
 
@@ -259,7 +234,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       }
 
       this.analytics.track('guest_submit_search', {
-        category: category?.name || 'unknown',
+        category: searchSession.searchRequest.categoryName || 'unknown',
         providers_found: searchSession.providers.length
       });
 
@@ -269,11 +244,9 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       console.error('Error creating guest search request:', error);
       this.searchErrorMessage = error?.message || 'No se pudo realizar la busqueda. Intentalo de nuevo.';
       this.analytics.track('guest_search_error');
+    } finally {
+      this.isLoading = false;
     }
-  }
-
-  onCategoryChange(event: any) {
-    this.selectedCategory = event.detail.value;
   }
 
   onModalDidDismiss() {
@@ -293,7 +266,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   get canSearch(): boolean {
-    return !!this.selectedCategory && this.serviceDescription.trim().length >= 3 && !this.isLoading && !this.isLocationLoading;
+    return this.serviceDescription.trim().length >= 3 && !this.isLoading && !this.isLocationLoading;
   }
 
   get locationText(): string {
@@ -617,22 +590,6 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
     const text = encodeURIComponent(`Hola ${response.providerName || ''}, vi tu respuesta en AjustadoATi y quiero continuar con el servicio.`);
     return `https://wa.me/${cleanPhone}?text=${text}`;
-  }
-
-  private getFallbackCategories(): Category[] {
-    return [
-      { id: 1, name: 'Plomeria', description: 'Servicios de instalacion y reparacion de tuberias' },
-      { id: 2, name: 'Electricidad', description: 'Instalacion y reparacion de sistemas electricos' },
-      { id: 3, name: 'Carpinteria', description: 'Trabajos en madera, muebles y puertas' },
-      { id: 4, name: 'Pintura', description: 'Pintura interior, exterior y acabados' },
-      { id: 5, name: 'Jardineria', description: 'Mantenimiento de jardines y poda' },
-      { id: 6, name: 'Limpieza', description: 'Limpieza domestica y comercial' },
-      { id: 7, name: 'Reparacion de Electrodomesticos', description: 'Mantenimiento de electrodomesticos' },
-      { id: 8, name: 'Construccion', description: 'Remodelacion y obra civil' },
-      { id: 9, name: 'Tecnologia', description: 'Soporte tecnico y reparacion de dispositivos' },
-      { id: 10, name: 'Transporte', description: 'Mudanzas y transporte de mercancias' },
-      { id: 11, name: 'Delivery', description: 'Entregas y mensajeria de proximidad' }
-    ];
   }
 
   private async showAlert(header: string, message: string) {

@@ -18,7 +18,7 @@
   <section class="hero-section">
     <div class="hero-copy">
       <span class="eyebrow">Búsqueda en tiempo real</span>
-      <h1>¿Necesitas un producto o un servicio?</h1>
+      <h1>¿Necesitas un servicio?</h1>
       <p>
         Olvídate de llamar a varios negocios. Publica lo que necesitas y deja que los proveedores cercanos te contacten.
       </p>
@@ -164,25 +164,9 @@
         </div>
 
         <ion-item fill="outline" class="form-item">
-          <ion-select
-            [(ngModel)]="selectedCategory"
-            interface="popover"
-            label="Categoria del servicio"
-            labelPlacement="stacked"
-            placeholder="Selecciona una categoria"
-            [disabled]="isLoading || categories.length === 0"
-            (ionChange)="onCategoryChange($event)"
-          >
-            <ion-select-option *ngFor="let category of categories" [value]="category.id">
-              {{ category.name }}
-            </ion-select-option>
-          </ion-select>
-          <ion-spinner *ngIf="isLoading" name="crescent" slot="end"></ion-spinner>
-        </ion-item>
-
-        <ion-item fill="outline" class="form-item">
           <ion-textarea
             [(ngModel)]="serviceDescription"
+            [disabled]="isLoading"
             label="Que necesitas?"
             labelPlacement="stacked"
             placeholder="Ej: instalar paneles solares, plomero urgente, mudanza pequena"
@@ -200,7 +184,7 @@
             <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion pendiente' }}</strong>
             <span>{{ locationText }}</span>
           </div>
-          <ion-button fill="solid" size="small" type="button" (click)="requestLocation(true)" [disabled]="isLocationLoading">
+          <ion-button fill="solid" size="small" type="button" (click)="requestLocation(true)" [disabled]="isLocationLoading || isLoading">
             <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
             <span *ngIf="!isLocationLoading">{{ userLocation ? 'Actualizar' : 'Usar mi ubicacion' }}</span>
           </ion-button>
@@ -212,7 +196,7 @@
 
         <ion-button expand="block" class="search-button" (click)="onSearch()" [disabled]="!canSearch || isLocationLoading">
           <ion-icon name="search-outline" slot="start"></ion-icon>
-          Buscar proveedores
+          {{ isLoading ? 'Interpretando tu solicitud...' : 'Buscar proveedores' }}
         </ion-button>
       </div>
 
