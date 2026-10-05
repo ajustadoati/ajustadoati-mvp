@@ -6,7 +6,7 @@ spring:
   # Configuración de base de datos (Supabase PostgreSQL)
   datasource:
     url: jdbc:postgresql://${SUPABASE_DB_HOST:aws-0-eu-west-1.pooler.supabase.com}:5432/${SUPABASE_DB_NAME:postgres}?sslmode=require
-    username: ${SUPABASE_DB_USER:xxxx}
+    username: ${SUPABASE_DB_USER:xxxxdd}
     password: ${SUPABASE_DB_PASSWORD:xxxx}
     driver-class-name: org.postgresql.Driver
 
