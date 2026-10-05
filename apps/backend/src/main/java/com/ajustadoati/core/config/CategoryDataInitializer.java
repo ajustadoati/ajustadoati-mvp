@@ -35,8 +35,8 @@ public class CategoryDataInitializer {
             );
 
             for (CategorySeed seed : defaultCategories) {
-                Category category = categoryRepository.findByNameIgnoreCase(seed.name())
-                        .orElseGet(() -> Category.builder().name(seed.name()).build());
+                if (categoryRepository.findByNameIgnoreCase(seed.name()).isPresent()) continue;
+                Category category = Category.builder().name(seed.name()).build();
 
                 category.setDescription(seed.description());
                 category.setDisplayOrder(seed.displayOrder());

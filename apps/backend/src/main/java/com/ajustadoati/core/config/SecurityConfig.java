@@ -43,6 +43,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/search-requests").permitAll()
                 // Endpoints públicos
                 .requestMatchers("/auth/**", "/categories", "/providers/public-search", "/providers/push-config", "/guest-requests/**", "/swagger-ui/**", "/api-docs/**", "/ws/**", "/ws-native/**", "/actuator/**").permitAll()
                 // Endpoints protegidos

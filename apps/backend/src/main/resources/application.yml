@@ -6,8 +6,8 @@ spring:
   # Configuración de base de datos (Supabase PostgreSQL)
   datasource:
     url: jdbc:postgresql://${SUPABASE_DB_HOST:aws-0-eu-west-1.pooler.supabase.com}:5432/${SUPABASE_DB_NAME:postgres}?sslmode=require
-    username: ${SUPABASE_DB_USER:postgres.ialorxfzvtwiebhfgzqv}
-    password: ${SUPABASE_DB_PASSWORD:wpgBVmSqDQwy6Cn0}
+    username: ${SUPABASE_DB_USER:xxxx}
+    password: ${SUPABASE_DB_PASSWORD:xxxx}
     driver-class-name: org.postgresql.Driver
 
   # JPA/Hibernate configuración
@@ -23,11 +23,21 @@ spring:
   # Security configuración
   security:
     jwt: #wJ9mN7rG2uY9pT3xQ8bR6sL2zC5vW1tE4yK7aH9dM3nQ6oP8uR2cJ5fL1eD7bS9g #/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==
-      secret: ${JWT_SECRET:/TBlizuhlaB8svU0AOZIz7nMPnuvAjf5kP1TIyB5B5TMo2X4rzRWu2qXeuLVyLEGrlyxM9tXdgSwjr9RYBgLAA==}
+      secret: ${JWT_SECRET:xxxx}
       expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
 # App-specific configuration
 app:
+  jev:
+    enabled: ${JEV_ENABLED:true}
+    api-key: ${TYPESAFE_API_KEY:changeit}
+    url: ${JEV_URL:https://api.typesafe.ai/v1/systemone}
+    model: ${JEV_MODEL:jev-1.13.0}
+    timeout-ms: ${JEV_TIMEOUT_MS:8000}
+    # Conservative starting values, to be calibrated against real Spanish searches.
+    min-confidence: ${JEV_MIN_CONFIDENCE:0.85}
+    min-margin: ${JEV_MIN_MARGIN:0.20}
+    max-calls-per-minute: ${JEV_MAX_CALLS_PER_MINUTE:30}
   admin:
     # Comma-separated list of emails allowed to access /admin endpoints
     emails: ${ADMIN_EMAILS:richardroj@gmail.com}

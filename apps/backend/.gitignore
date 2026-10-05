@@ -7,3 +7,4 @@ logs/
 .vscode/
 *.iml
 .DS_Store
+*-local.yml

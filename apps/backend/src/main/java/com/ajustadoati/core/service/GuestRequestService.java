@@ -96,11 +96,18 @@ public class GuestRequestService {
     }
 
     public GuestRequestDto createRequest(GuestRequestCreateRequest request) {
+        return createRequest(request, null);
+    }
+
+    public GuestRequestDto createRequest(GuestRequestCreateRequest request, String requesterEmail) {
+        Category category = categoryRepository.findById(request.categoryId())
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+                .orElseThrow(() -> new IllegalArgumentException("Categoria no disponible"));
         UUID requestId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         Double maxDistanceKm = request.maxDistanceKm() != null ? request.maxDistanceKm() : 50.0;
-        String categoryName = resolveCategoryName(request.categoryId(), request.categoryName());
-        String guestRef = buildGuestRef(requestId);
+        String categoryName = category.getName();
+        String guestRef = requesterEmail != null ? requesterEmail : buildGuestRef(requestId);
 
         GuestRequestSession session = new GuestRequestSession(
                 requestId,
@@ -118,7 +125,15 @@ public class GuestRequestService {
                 new ArrayList<>()
         );
 
-        int notifiedProviders = notifyProviders(session);
+        // Store before sending so an immediate provider response can find its request.
+        sessions.put(requestId, session);
+        int notifiedProviders = 0;
+        try {
+            notifiedProviders = notifyProviders(session);
+        } catch (RuntimeException exception) {
+            // Publication already exists. Keep it available in the backlog rather than duplicate it on retry.
+            log.warn("Request {} stored but live dispatch failed ({})", requestId, exception.getClass().getSimpleName());
+        }
         session.notifiedProviders = notifiedProviders;
         session.updatedAt = LocalDateTime.now();
         sessions.put(requestId, session);
