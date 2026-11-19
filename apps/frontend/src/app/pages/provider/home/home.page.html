@@ -7,7 +7,7 @@
       <ion-button *ngIf="isAdmin" (click)="goToAdmin()" title="Backoffice">
         <ion-icon slot="icon-only" name="shield-checkmark-outline"></ion-icon>
       </ion-button>
-      <ion-button (click)="refreshLocation()">
+      <ion-button (click)="refreshLocation()" [disabled]="isLocationLoading" aria-label="Actualizar ubicación">
         <ion-icon slot="icon-only" name="location-outline"></ion-icon>
       </ion-button>
       <ion-button (click)="logout()">
@@ -59,8 +59,9 @@
   <!-- Header con saludo -->
   <div class="header-card">
     <h1 class="greeting">{{ greetingText }}, {{ user?.fullName || 'Proveedor' }}!</h1>
-    <p class="subtitle" *ngIf="isAvailable">Listo para recibir solicitudes</p>
-    <p class="subtitle" *ngIf="!isAvailable">No disponible para solicitudes</p>
+    <p class="subtitle" *ngIf="isLocationLoading">Verificando ubicación...</p>
+    <p class="subtitle" *ngIf="!isLocationLoading && isAvailable">Listo para recibir solicitudes</p>
+    <p class="subtitle" *ngIf="!isLocationLoading && !isAvailable">No disponible para solicitudes</p>
 
     <!-- Availability Toggle -->
     <div class="availability-toggle">
@@ -72,6 +73,7 @@
         <ion-toggle
           [(ngModel)]="isAvailable"
           (ionChange)="toggleAvailability($event.detail.checked)"
+          [disabled]="isLocationLoading"
           color="success"
         ></ion-toggle>
       </div>
@@ -88,6 +90,12 @@
         <ion-icon name="location"></ion-icon>
         <ion-label>{{ locationText }}</ion-label>
       </ion-chip>
+    </div>
+    <div class="location-retry" *ngIf="locationErrorMessage" role="alert">
+      <span>{{ locationErrorMessage }}</span>
+      <ion-button size="small" fill="outline" color="light" (click)="refreshLocation()" [disabled]="isLocationLoading">
+        Reintentar ubicación
+      </ion-button>
     </div>
   </div>
 
@@ -190,7 +198,9 @@
   </div>
 
   <div class="responses-list" *ngIf="sentResponses.length > 0; else noResponses">
-    <ion-card *ngFor="let response of sentResponses.slice(0, 5)" class="response-card">
+    <ion-card *ngFor="let response of sentResponses.slice(0, 5)" class="response-card"
+      role="button" tabindex="0" (click)="viewRequest(response.request)"
+      (keydown.enter)="viewRequest(response.request)">
       <ion-card-content>
         <div class="request-header">
           <div class="request-info">

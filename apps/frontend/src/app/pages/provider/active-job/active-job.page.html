@@ -78,7 +78,7 @@
             <ion-icon name="person-circle-outline"></ion-icon>
           </div>
           <div class="client-details">
-            <h3>{{ activeJob.clientName }}</h3>
+            <h3>{{ activeJob.clientName.startsWith('guest+') ? 'Cliente invitado' : activeJob.clientName }}</h3>
             <p *ngIf="activeJob.clientPhone">{{ activeJob.clientPhone }}</p>
           </div>
         </div>
@@ -95,7 +95,7 @@
         </div>
 
         <!-- Contact Actions -->
-        <div class="contact-actions">
+        <div class="contact-actions" *ngIf="activeJob.clientPhone">
           <ion-button fill="solid" color="success" (click)="callClient()">
             <ion-icon name="call-outline" slot="start"></ion-icon>
             Llamar
@@ -127,6 +127,7 @@
         color="success"
         *ngIf="activeJob.status === 'on_site' || activeJob.status === 'working'"
         (click)="markCompleted()"
+        [disabled]="isCompleting"
       >
         <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
         Trabajo Completado

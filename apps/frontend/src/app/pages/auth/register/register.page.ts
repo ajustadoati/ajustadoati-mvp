@@ -23,6 +23,7 @@ export class RegisterPage implements OnInit {
   availableCategories: Category[] = [];
   selectedCategories: number[] = [];
   loadingCategories = false;
+  categoryError = '';
 
   // Location state — registration is blocked until we have one
   userLocation: { latitude: number; longitude: number } | null = null;
@@ -54,10 +55,6 @@ export class RegisterPage implements OnInit {
   async ngOnInit() {
     console.log('📝 Register page initialized');
     await this.loadCategories();
-    // Trigger the browser permission prompt up-front so the provider
-    // grants location once and the submit button enables on its own,
-    // rather than failing silently at the end of the flow.
-    this.requestLocation();
   }
 
   async requestLocation() {
@@ -249,6 +246,7 @@ export class RegisterPage implements OnInit {
   // Load categories from service
   private async loadCategories() {
     this.loadingCategories = true;
+    this.categoryError = '';
     
     try {
       console.log('🔄 Loading categories from backend API...');
@@ -261,23 +259,18 @@ export class RegisterPage implements OnInit {
       }
       
     } catch (error) {
-      console.warn('⚠️ Error loading categories from backend:', error);
-      console.log('🔄 Falling back to default categories');
-      this.availableCategories = this.getFallbackCategories();
+      console.error('Error loading categories from backend:', error);
+      this.availableCategories = [];
+      this.selectedCategories = [];
+      this.registerForm.patchValue({ categories: [] });
+      this.categoryError = 'No pudimos cargar las categorías. Comprueba tu conexión e inténtalo de nuevo.';
     } finally {
       this.loadingCategories = false;
     }
   }
 
-  private getFallbackCategories(): Category[] {
-    return [
-      { id: 1, name: 'Electrónicos', description: 'Reparación de dispositivos electrónicos' },
-      { id: 2, name: 'Electrodomésticos', description: 'Reparación de electrodomésticos' },
-      { id: 3, name: 'Automotriz', description: 'Servicios automotrices' },
-      { id: 4, name: 'Hogar', description: 'Servicios para el hogar' },
-      { id: 5, name: 'Tecnología', description: 'Servicios tecnológicos' },
-      { id: 6, name: 'Otros', description: 'Otros servicios' }
-    ];
+  retryCategories() {
+    void this.loadCategories();
   }
 
   // Toggle category selection

@@ -62,6 +62,26 @@ export class HybridGeolocationService {
    * Obtener posición usando HTML5 Geolocation API (para web)
    */
   private async getCurrentPositionWeb(): Promise<Position> {
+    try {
+      return await this.requestWebPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000
+      });
+    } catch (error) {
+      const code = (error as LocationError)?.code;
+      if (code !== 2 && code !== 3) throw error;
+      // Desktop browsers often cannot obtain a GPS-grade fix. A fresh network
+      // position is still useful; never fall back to a saved profile location.
+      return this.requestWebPosition({
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 60000
+      });
+    }
+  }
+
+  private requestWebPosition(options: PositionOptions): Promise<Position> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject({
@@ -89,17 +109,12 @@ export class HybridGeolocationService {
           resolve(result);
         },
         (error) => {
-          console.error('🚨 HTML5 Geolocation error:', error);
           reject({
             code: error.code,
             message: this.getWebLocationErrorMessage(error.code)
           });
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 300000 // 5 minutos
-        }
+        options
       );
     });
   }

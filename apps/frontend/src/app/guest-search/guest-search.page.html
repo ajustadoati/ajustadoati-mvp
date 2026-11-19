@@ -26,18 +26,18 @@
       <div class="hero-actions">
         <ion-button size="large" class="hero-primary" (click)="openSearchModal()">
           <ion-icon name="search-outline" slot="start"></ion-icon>
-          Buscar ahora
+          {{ currentSearchSession?.isGuestSearch ? 'Ver mi solicitud' : 'Buscar ahora' }}
         </ion-button>
       </div>
 
       <div class="hero-examples">
         <span class="examples-label">Ejemplos:</span>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Fontanero</button>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Electricista</button>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Cerrajero</button>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Mecánico</button>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Aire acondicionado</button>
-        <button class="example-chip" type="button" (click)="openSearchModal()">Reformas</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito reparar una tubería que pierde agua')">Plomería</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito instalar un enchufe eléctrico')">Electricidad</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito pintar una habitación')">Pintura</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito una reforma de albañilería en mi casa')">Construcción</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito transportar muebles para una mudanza')">Transporte</button>
+        <button class="example-chip" type="button" (click)="openSearchModal('Necesito que entreguen un paquete')">Delivery</button>
       </div>
     </div>
   </section>
@@ -135,12 +135,12 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button *ngIf="modalStep === 'results'" fill="clear" (click)="backToForm()">
-            <ion-icon name="arrow-back-outline" slot="icon-only"></ion-icon>
+            <ion-icon name="arrow-back-outline" slot="icon-only" aria-label="Volver a la búsqueda"></ion-icon>
           </ion-button>
         </ion-buttons>
         <ion-title>{{ modalStep === 'form' ? 'Buscar servicio' : 'Proveedores cercanos' }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button fill="clear" (click)="closeSearchModal()">
+          <ion-button fill="clear" (click)="closeSearchModal()" aria-label="Cerrar búsqueda">
             <ion-icon name="close-outline" slot="icon-only"></ion-icon>
           </ion-button>
         </ion-buttons>
@@ -150,27 +150,18 @@
     <ion-content class="modal-content">
       <div class="modal-stage" *ngIf="modalStep === 'form'">
         <div class="modal-intro">
-          <span>Busqueda guiada</span>
           <h2>Cuéntanos qué necesitas</h2>
-          <p>Al buscar activaremos tu ubicación para mostrar a los proveedores dónde te encuentras.</p>
-        </div>
-
-        <div class="search-helper-card">
-          <ion-icon name="logo-whatsapp"></ion-icon>
-          <p>
-            Cuando respondan, se irán agregando al mapa con su información principal para que puedas escribirles
-            directamente por WhatsApp.
-          </p>
+          <p>Describe el servicio y comparte tu ubicación para encontrar profesionales cercanos.</p>
         </div>
 
         <ion-item fill="outline" class="form-item">
           <ion-textarea
             [(ngModel)]="serviceDescription"
             [disabled]="isLoading"
-            label="Que necesitas?"
+            label="¿Qué necesitas?"
             labelPlacement="stacked"
-            placeholder="Ej: instalar paneles solares, plomero urgente, mudanza pequena"
-            rows="4"
+            placeholder="Ej: necesito reparar una fuga de agua en casa"
+            rows="3"
             maxlength="180"
             [counter]="true"
           ></ion-textarea>
@@ -181,12 +172,12 @@
             <ion-icon [name]="userLocation ? 'location' : 'location-outline'"></ion-icon>
           </div>
           <div>
-            <strong>{{ userLocation ? 'Ubicacion lista' : 'Ubicacion pendiente' }}</strong>
+            <strong>{{ userLocation ? 'Ubicación lista' : 'Comparte tu ubicación' }}</strong>
             <span>{{ locationText }}</span>
           </div>
           <ion-button fill="solid" size="small" type="button" (click)="requestLocation(true)" [disabled]="isLocationLoading || isLoading">
             <ion-spinner name="crescent" *ngIf="isLocationLoading"></ion-spinner>
-            <span *ngIf="!isLocationLoading">{{ userLocation ? 'Actualizar' : 'Usar mi ubicacion' }}</span>
+            <span *ngIf="!isLocationLoading">{{ userLocation ? 'Actualizar' : 'Usar mi ubicación' }}</span>
           </ion-button>
         </div>
 
@@ -196,26 +187,38 @@
 
         <ion-button expand="block" class="search-button" (click)="onSearch()" [disabled]="!canSearch || isLocationLoading">
           <ion-icon name="search-outline" slot="start"></ion-icon>
-          {{ isLoading ? 'Interpretando tu solicitud...' : 'Buscar proveedores' }}
+          {{ isLoading ? 'Buscando proveedores...' : 'Buscar proveedores' }}
         </ion-button>
       </div>
 
       <div class="modal-stage results-stage" *ngIf="modalStep === 'results'">
         <div class="results-summary" *ngIf="currentSearchSession">
+          <span class="result-category">{{ currentSearchSession.searchRequest.categoryName || 'Servicio' }}</span>
           <h2>{{ currentSearchSession.searchRequest.productName }}</h2>
-          <div class="results-stats">
-            <span>{{ providersCount }} proveedores encontrados</span>
-            <span *ngIf="notifiedProvidersCount">• {{ notifiedProvidersCount }} notificados</span>
-            <span *ngIf="responsesCount">• {{ responsesCount }} respuestas</span>
-          </div>
+          <p class="result-status" [class.result-status--answered]="responsesCount > 0">
+            {{ currentSearchSession.searchRequest.status === 'completed' ? 'Trabajo finalizado por el proveedor'
+              : currentSearchSession.searchRequest.status === 'accepted' ? 'Proveedor elegido. Coordina el servicio directamente.'
+              : responsesCount > 0
+              ? (responsesCount === 1 ? '1 proveedor respondió' : responsesCount + ' proveedores respondieron')
+              : (providersCount > 0 ? 'Esperando respuestas de proveedores cercanos' : 'No hay proveedores cercanos disponibles') }}
+          </p>
         </div>
 
         <div class="inline-error" *ngIf="searchErrorMessage">{{ searchErrorMessage }}</div>
 
+        <div class="response-alert" *ngIf="respondedProviders.length > 0">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <div>
+            <strong>{{ respondedProviders[0].response.providerName }} respondió</strong>
+            <span>Consulta su propuesta y contacta directamente.</span>
+          </div>
+          <button type="button" (click)="showResponse(respondedProviders[0].response.id)">Ver</button>
+        </div>
+
         <div class="results-map-card">
           <div class="map-card-header">
-            <h3>Mapa en tiempo real</h3>
-            <p>Azul: tu ubicación. Verde: proveedores cercanos. Naranja: proveedores que ya respondieron.</p>
+            <h3>Proveedores en tu zona</h3>
+            <p *ngIf="responsesCount === 0 && providersCount > 0">Las respuestas aparecerán aquí y en el mapa.</p>
           </div>
           <div id="guest-results-map" class="results-map"></div>
           <div class="map-empty" *ngIf="!isMapReady">
@@ -224,51 +227,31 @@
           <div class="map-legend">
             <div class="legend-item">
               <span class="legend-dot user"></span>
-              <span>Tu ubicacion</span>
+              <span>Tú</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot provider"></span>
-              <span>Proveedor cercano</span>
+              <span>Cercano</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot responded"></span>
-              <span>Proveedor que respondio</span>
+              <span>Respondió</span>
             </div>
           </div>
         </div>
 
-        <ion-card class="providers-list-card" *ngIf="currentSearchSession && providersCount > 0">
-          <ion-card-header>
-            <ion-card-title>Proveedores cercanos</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list lines="full">
-              <ion-item *ngFor="let provider of currentSearchSession.providers; let i = index; trackBy: trackProviderById">
-                <ion-label>
-                  <h3>{{ i + 1 }}. {{ provider.name }}</h3>
-                  <p *ngIf="provider.locations && provider.locations.length > 0 && provider.locations[0].distance">
-                    {{ provider.locations[0].distance!.toFixed(1) }} km
-                  </p>
-                </ion-label>
-                <ion-badge slot="end" color="success" *ngIf="provider.rating">
-                  {{ provider.rating!.toFixed(1) }}
-                </ion-badge>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
-
         <div class="responses-section" *ngIf="currentSearchSession">
-          <h3 class="responses-heading">Respuestas de proveedores</h3>
+          <h3 class="responses-heading" *ngIf="responsesCount > 0">Propuestas recibidas</h3>
 
           <div class="empty-responses" *ngIf="responsesCount === 0">
             <ion-icon name="information-circle-outline"></ion-icon>
-            <p>Aun no hay respuestas. Si llegan, las veras aqui sin salir del flujo.</p>
+            <p>Puedes dejar esta pantalla abierta. Cuando un proveedor responda, verás su propuesta aquí.</p>
           </div>
 
           <ion-card
             class="response-card"
             *ngFor="let item of respondedProviders; trackBy: trackResponseById"
+            [id]="'guest-response-' + item.response.id"
             [class.response-card--accepted]="isResponseAccepted(item.response.id)"
           >
             <ion-card-content>
@@ -297,9 +280,9 @@
               </div>
 
               <div class="response-actions" *ngIf="!hasAcceptedOffer">
-                <ion-button fill="solid" color="primary" expand="block" (click)="acceptGuestOffer(item.response)">
+                <ion-button fill="solid" color="primary" expand="block" (click)="acceptGuestOffer(item.response)" [disabled]="isAcceptingOffer">
                   <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
-                  Aceptar oferta
+                  Elegir proveedor
                 </ion-button>
                 <a
                   *ngIf="item.whatsappUrl"
@@ -314,7 +297,7 @@
               </div>
 
               <div class="response-accepted-actions" *ngIf="isResponseAccepted(item.response.id)">
-                <p class="accepted-message">¡Oferta aceptada! Coordina con el proveedor directamente.</p>
+                <p class="accepted-message">{{ currentSearchSession.searchRequest.status === 'completed' ? 'El proveedor marcó el trabajo como finalizado.' : '¡Oferta aceptada! Coordina con el proveedor directamente.' }}</p>
                 <a
                   *ngIf="item.whatsappUrl"
                   [href]="item.whatsappUrl"

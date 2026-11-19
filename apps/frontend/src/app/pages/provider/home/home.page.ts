@@ -36,11 +36,13 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   user: BackendUserInfo | null = null;
   currentPosition: Position | null = null;
   isLocationLoading = false;
+  isLocationSynced = false;
+  locationErrorMessage = '';
   isConnectedToWebSocket = false;
   isAuthenticated = false;
 
   // Availability toggle
-  isAvailable = true;
+  isAvailable = false;
 
   isAdmin = false;
 
@@ -51,12 +53,24 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   isIosStandaloneCandidate = false; // iOS Safari, not yet in home screen
   private readonly PUSH_BANNER_DISMISSED_KEY = 'push_banner_dismissed_at';
   private readonly INSTALL_BANNER_DISMISSED_KEY = 'install_banner_dismissed_at';
+  private readonly handleInstallPrompt = (event: Event) => {
+    event.preventDefault();
+    this.deferredInstall = event as BeforeInstallPromptEvent;
+    if (!this.wasDismissedRecently(this.INSTALL_BANNER_DISMISSED_KEY)) {
+      this.showInstallBanner = true;
+    }
+  };
+  private readonly handleAppInstalled = () => {
+    this.deferredInstall = undefined;
+    this.showInstallBanner = false;
+  };
 
   pendingRequests: ServiceRequest[] = [];
   sentResponses: ProviderSentResponse[] = [];
   activeJob: ProviderActiveJob | null = null;
 
   private subscriptions: Subscription[] = [];
+  private locationSubscription: Subscription | null = null;
 
   constructor(
     public router: Router,
@@ -74,28 +88,33 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   async ngOnInit() {
     console.log('🏠 Provider Home page initialized');
 
+    // Catch the install event before GPS, profile and WebSocket awaits delay the page.
+    this.wireInstallPrompt();
+
     // Load user profile
     await this.loadUserProfile();
 
+    this.subscribeToWorkspaceState();
+    this.subscribeToServiceRequests();
+    void this.providerWorkspace.fetchAcceptedJob();
+
     // Initialize location services
-    await this.initializeLocation();
+    const locationReady = await this.initializeLocation();
 
     // Initialize WebSocket connection
-    await this.initializeWebSocket();
-
-    this.subscribeToWorkspaceState();
-
-    // Subscribe to service requests
-    this.subscribeToServiceRequests();
+    if (locationReady) {
+      this.isAvailable = true;
+      await this.initializeWebSocket();
+      if (this.isAvailable) void this.providerWorkspace.fetchPendingBacklog();
+    } else {
+      this.isAvailable = false;
+    }
 
     // Request notification permissions
     await this.requestNotificationPermissions();
 
     // Show admin button only for accounts listed in the backend's ADMIN_EMAILS
     this.adminService.checkAccess().then(isAdmin => (this.isAdmin = isAdmin));
-
-    // Wire the "install to home screen" prompt (Android/Chrome)
-    this.wireInstallPrompt();
 
     // Route push notification clicks to /provider/home (or the URL in payload)
     this.pushNotifications.wireClickHandler('/provider/home');
@@ -109,11 +128,8 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
     const dismissed = this.wasDismissedRecently(this.INSTALL_BANNER_DISMISSED_KEY);
 
-    window.addEventListener('beforeinstallprompt', (e: Event) => {
-      e.preventDefault();
-      this.deferredInstall = e as BeforeInstallPromptEvent;
-      if (!dismissed) this.showInstallBanner = true;
-    });
+    window.addEventListener('beforeinstallprompt', this.handleInstallPrompt);
+    window.addEventListener('appinstalled', this.handleAppInstalled);
 
     // iOS Safari fires no event — show a manual card if we detect it
     if (this.isIosSafari() && !dismissed) {
@@ -207,6 +223,9 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   ngOnDestroy() {
     // Cleanup subscriptions
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.locationSubscription = null;
+    window.removeEventListener('beforeinstallprompt', this.handleInstallPrompt);
+    window.removeEventListener('appinstalled', this.handleAppInstalled);
 
     // Stop location watching
     this.geolocation.stopWatching();
@@ -221,43 +240,70 @@ export class ProviderHomePage implements OnInit, OnDestroy {
       this.providerWorkspace.ensureBelongsTo(this.user?.email);
       console.log('👤 Provider profile loaded:', this.user);
 
-      // Pull the backlog of guest requests that already matched us but
-      // couldn't reach us over WebSocket (app was closed). Without this,
-      // opening the app from a push notification lands on an empty
-      // dashboard.
-      void this.providerWorkspace.fetchPendingBacklog();
     } catch (error) {
       console.error('Error loading provider profile:', error);
     }
   }
 
-  private async initializeLocation() {
+  private async initializeLocation(): Promise<boolean> {
     try {
       this.isLocationLoading = true;
+      this.locationErrorMessage = '';
 
-      // Get current position
       this.currentPosition = await this.geolocation.getCurrentPosition();
-      console.log('📍 Current position:', this.currentPosition);
+      const locationChanged = await this.syncProviderLocation(this.currentPosition);
+      if (locationChanged) this.websocket.disconnect();
 
-      // Start watching position for real-time updates
-      await this.geolocation.startWatching();
-
-      // Subscribe to position updates
-      const positionSub = this.geolocation.getCurrentPositionObservable()
-        .subscribe(position => {
-          if (position) {
-            this.currentPosition = position;
-          }
-        });
-
-      this.subscriptions.push(positionSub);
+      await this.watchLocation();
+      return true;
 
     } catch (error) {
       console.error('📍 Location error:', error);
-      await this.showToast('No se pudo obtener la ubicación. Algunas funciones podrían estar limitadas.', 'warning');
+      this.isLocationSynced = false;
+      this.isAvailable = false;
+      this.websocket.disconnect();
+      this.locationErrorMessage = this.describeLocationError(error);
+      return false;
     } finally {
       this.isLocationLoading = false;
     }
+  }
+
+  private async watchLocation(): Promise<void> {
+    try {
+      await this.geolocation.startWatching();
+    } catch (error) {
+      console.warn('Could not watch provider location:', error);
+    }
+    if (!this.locationSubscription) {
+      this.locationSubscription = this.geolocation.getCurrentPositionObservable()
+        .subscribe(position => {
+          if (position) this.currentPosition = position;
+        });
+      this.subscriptions.push(this.locationSubscription);
+    }
+  }
+
+  private async syncProviderLocation(position: Position): Promise<boolean> {
+    const saved = this.user?.location;
+    const changed = !saved || Math.abs(saved.latitude - position.latitude) > 0.0001
+        || Math.abs(saved.longitude - position.longitude) > 0.0001;
+    if (changed) {
+      this.user = await this.auth.updateProfile({
+        location: { latitude: position.latitude, longitude: position.longitude }
+      });
+    }
+    this.isLocationSynced = true;
+    this.locationErrorMessage = '';
+    return changed;
+  }
+
+  private describeLocationError(error: unknown): string {
+    const code = (error as { code?: number })?.code;
+    if (code === 1) return 'El navegador no tiene permiso de ubicación. Actívalo para este sitio y vuelve a intentar.';
+    if (code === 2) return 'Tu dispositivo no pudo determinar la ubicación. Comprueba la ubicación del sistema y vuelve a intentar.';
+    if (code === 3) return 'La ubicación tardó demasiado. Comprueba el GPS o la red y vuelve a intentar.';
+    return 'No pudimos sincronizar tu ubicación. Comprueba la conexión y vuelve a intentar.';
   }
 
   private async initializeWebSocket() {
@@ -307,6 +353,8 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     } catch (error) {
       console.error('🔌 WebSocket connection failed:', error);
       this.isConnectedToWebSocket = false;
+      this.isAvailable = false;
+      this.websocket.disconnect();
     }
   }
 
@@ -340,8 +388,8 @@ export class ProviderHomePage implements OnInit, OnDestroy {
         console.log('🔔🔔🔔 SERVICE REQUEST ARRIVED IN PROVIDER HOME:', request);
 
         // Only process if available
-        if (!this.isAvailable) {
-          console.log('⚠️ Ignoring request - provider not available');
+        if (!this.isAvailable || !this.isLocationSynced) {
+          console.log('⚠️ Ignoring request - provider not ready');
           return;
         }
 
@@ -362,12 +410,20 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
     if (this.isAvailable) {
       try {
+        this.currentPosition = await this.geolocation.getCurrentPosition();
+        await this.syncProviderLocation(this.currentPosition);
+        this.locationErrorMessage = '';
+        this.websocket.disconnect();
         await this.websocket.connect();
+        void this.providerWorkspace.fetchPendingBacklog();
         await this.showToast('Estas disponible para recibir solicitudes', 'success');
       } catch (error) {
         console.error('Error connecting WebSocket:', error);
-        await this.showToast('Error al conectar', 'danger');
+        this.isLocationSynced = false;
         this.isAvailable = false;
+        this.websocket.disconnect();
+        this.locationErrorMessage = this.describeLocationError(error);
+        await this.showToast(this.locationErrorMessage, 'danger');
       }
     } else {
       this.websocket.disconnect();
@@ -433,11 +489,25 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   async refreshLocation() {
     try {
       this.isLocationLoading = true;
+      this.locationErrorMessage = '';
       this.currentPosition = await this.geolocation.getCurrentPosition();
-      await this.showToast('Ubicación actualizada', 'success');
+      await this.syncProviderLocation(this.currentPosition);
+      await this.watchLocation();
+      if (this.isAvailable) {
+        this.websocket.disconnect();
+        await this.websocket.connect();
+        void this.providerWorkspace.fetchPendingBacklog();
+      }
+      await this.showToast(this.isAvailable
+        ? 'Ubicación actualizada para recibir solicitudes cercanas'
+        : 'Ubicación actualizada. Activa tu disponibilidad para recibir solicitudes', 'success');
     } catch (error) {
       console.error('Error refreshing location:', error);
-      await this.showToast('Error al actualizar ubicación', 'danger');
+      this.isLocationSynced = false;
+      this.isAvailable = false;
+      this.websocket.disconnect();
+      this.locationErrorMessage = this.describeLocationError(error);
+      await this.showToast(this.locationErrorMessage, 'danger');
     } finally {
       this.isLocationLoading = false;
     }
@@ -500,6 +570,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     if (!this.currentPosition) {
       return this.isLocationLoading ? 'Obteniendo ubicación...' : 'Ubicación no disponible';
     }
+    if (!this.isLocationSynced) return 'Ubicación no sincronizada';
     return this.currentPosition.address || `${this.currentPosition.latitude.toFixed(4)}, ${this.currentPosition.longitude.toFixed(4)}`;
   }
 

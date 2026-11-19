@@ -287,11 +287,6 @@ ${formValues.estimatedCost ? `💰 Costo estimado: ${formValues.estimatedCost}` 
     }
   }
 
-  async callClient() {
-    // TODO: Implement call functionality
-    await this.showToast('Función de llamada en desarrollo', 'warning');
-  }
-
   async getDirections() {
     if (!this.request) return;
 

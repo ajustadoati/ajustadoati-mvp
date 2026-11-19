@@ -9,6 +9,7 @@ import com.ajustadoati.core.repository.CategoryRepository;
 import com.ajustadoati.core.repository.ProfileRepository;
 import com.ajustadoati.core.websocket.ConnectionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,8 +37,30 @@ public class GuestRequestService {
     private final ProfileRepository profileRepository;
     private final ObjectMapper objectMapper;
     private final WebPushService webPushService;
+    private final GuestRequestStore store;
 
     private final Map<UUID, GuestRequestSession> sessions = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void restoreRequests() {
+        for (GuestRequestStore.StoredRequest entry : store.loadAll()) {
+            GuestRequestDto request = entry.request();
+            GuestRequestSession session = new GuestRequestSession(
+                    request.id(), request.guestRef(), request.categoryId(), request.categoryName(),
+                    request.message(), request.latitude(), request.longitude(), request.maxDistanceKm(),
+                    request.status(), request.notifiedProviders(), request.createdAt(), request.updatedAt(),
+                    new ArrayList<>(request.responses()));
+            session.demo = entry.demo();
+            session.demoProviderEmail = entry.demoProviderEmail();
+            session.acceptedResponseId = request.acceptedResponseId();
+            sessions.put(session.id, session);
+        }
+        log.info("Restored {} guest requests from PostgreSQL", sessions.size());
+    }
+
+    private void persist(GuestRequestSession session) {
+        store.save(new GuestRequestStore.StoredRequest(toDto(session), session.demo, session.demoProviderEmail));
+    }
 
     @Value("${app.requests.expiration-minutes:15}")
     private long expirationMinutes;
@@ -67,8 +90,13 @@ public class GuestRequestService {
             }
 
             synchronized (session) {
+                if ((!"pending".equals(session.status) && !"responded".equals(session.status))
+                        || session.createdAt.isAfter(cutoff)) {
+                    continue;
+                }
                 session.status = "expired";
                 session.updatedAt = LocalDateTime.now();
+                persist(session);
             }
 
             WebSocketDto.OutgoingMessage expiredMessage = WebSocketDto.OutgoingMessage.builder()
@@ -127,6 +155,7 @@ public class GuestRequestService {
 
         // Store before sending so an immediate provider response can find its request.
         sessions.put(requestId, session);
+        persist(session);
         int notifiedProviders = 0;
         try {
             notifiedProviders = notifyProviders(session);
@@ -137,6 +166,7 @@ public class GuestRequestService {
         session.notifiedProviders = notifiedProviders;
         session.updatedAt = LocalDateTime.now();
         sessions.put(requestId, session);
+        persist(session);
 
         return toDto(session);
     }
@@ -151,8 +181,8 @@ public class GuestRequestService {
         if (session == null) {
             throw new RuntimeException("Guest request not found: " + requestId);
         }
-        if ("expired".equals(session.status)) {
-            throw new RuntimeException("La solicitud ya caducó");
+        if (!"pending".equals(session.status) && !"responded".equals(session.status)) {
+            throw new IllegalStateException("La solicitud ya no admite respuestas");
         }
 
         GuestRequestResponseDto response = new GuestRequestResponseDto(
@@ -168,11 +198,15 @@ public class GuestRequestService {
         );
 
         synchronized (session) {
+            if (!"pending".equals(session.status) && !"responded".equals(session.status)) {
+                throw new IllegalStateException("La solicitud ya no admite respuestas");
+            }
             // Replace any previous admin response with the fresh one
             session.responses.removeIf(r -> adminResponderEmail.equalsIgnoreCase(r.providerEmail()));
             session.responses.add(0, response);
             session.status = "responded";
             session.updatedAt = LocalDateTime.now();
+            persist(session);
         }
 
         log.info("[ADMIN-RESPUESTA] peticion={} | mensaje=\"{}\"", requestId, message);
@@ -219,7 +253,11 @@ public class GuestRequestService {
         }
         List<GuestRequestDto> out = new ArrayList<>();
         for (GuestRequestSession session : sessions.values()) {
-            if ("expired".equals(session.status) || "accepted".equals(session.status)) {
+            if (!"pending".equals(session.status) && !"responded".equals(session.status)) {
+                continue;
+            }
+            if (session.demo && (providerEmail == null
+                    || !providerEmail.equalsIgnoreCase(session.demoProviderEmail))) {
                 continue;
             }
             if (!providerCategories.contains(session.categoryId)) {
@@ -239,6 +277,19 @@ public class GuestRequestService {
         return out;
     }
 
+    public List<GuestRequestDto> getAcceptedForProvider(String providerEmail) {
+        return sessions.values().stream()
+                .filter(session -> "accepted".equals(session.status))
+                .filter(session -> {
+                    GuestRequestResponseDto selected = selectedResponse(session);
+                    return selected != null && selected.providerEmail() != null
+                            && selected.providerEmail().equalsIgnoreCase(providerEmail);
+                })
+                .sorted((a, b) -> b.updatedAt.compareTo(a.updatedAt))
+                .map(this::toDto)
+                .toList();
+    }
+
     public int acceptResponse(UUID requestId, UUID responseId) {
         GuestRequestSession session = sessions.get(requestId);
         if (session == null) {
@@ -251,11 +302,50 @@ public class GuestRequestService {
                 .orElseThrow(() -> new RuntimeException("Response not found: " + responseId));
 
         synchronized (session) {
+            if (!"responded".equals(session.status)) {
+                throw new IllegalStateException("La solicitud no admite una nueva aceptacion");
+            }
             session.status = "accepted";
+            session.acceptedResponseId = responseId;
             session.updatedAt = LocalDateTime.now();
+            persist(session);
         }
 
         return notifyProviderOfAcceptance(session, response);
+    }
+
+    public GuestRequestDto completeRequest(UUID requestId, String providerEmail) {
+        GuestRequestSession session = sessions.get(requestId);
+        if (session == null) {
+            throw new IllegalArgumentException("Solicitud no encontrada");
+        }
+
+        synchronized (session) {
+            if (!"accepted".equals(session.status) && !"completed".equals(session.status)) {
+                throw new IllegalStateException("Solo se puede completar una solicitud aceptada");
+            }
+            // Older accepted rows have no selected response ID. A single response
+            // is unambiguous; multiple responses require the saved selection.
+            GuestRequestResponseDto selected = selectedResponse(session);
+            if (selected == null || selected.providerEmail() == null
+                    || !selected.providerEmail().equalsIgnoreCase(providerEmail)) {
+                throw new SecurityException("Esta solicitud no pertenece al proveedor");
+            }
+            if ("completed".equals(session.status)) {
+                return toDto(session);
+            }
+            session.acceptedResponseId = selected.id();
+            session.status = "completed";
+            session.updatedAt = LocalDateTime.now();
+            persist(session);
+            return toDto(session);
+        }
+    }
+
+    private GuestRequestResponseDto selectedResponse(GuestRequestSession session) {
+        return session.acceptedResponseId != null
+                ? session.responses.stream().filter(r -> r.id().equals(session.acceptedResponseId)).findFirst().orElse(null)
+                : session.responses.size() == 1 ? session.responses.get(0) : null;
     }
 
     private int notifyProviderOfAcceptance(GuestRequestSession session, GuestRequestResponseDto response) {
@@ -306,6 +396,10 @@ public class GuestRequestService {
         );
 
         synchronized (session) {
+            if (!"pending".equals(session.status) && !"responded".equals(session.status)) {
+                log.info("Ignoring response for closed guest request {}", requestId);
+                return;
+            }
             int existingIndex = -1;
             for (int i = 0; i < session.responses.size(); i++) {
                 GuestRequestResponseDto existing = session.responses.get(i);
@@ -328,6 +422,7 @@ public class GuestRequestService {
 
             session.status = "responded";
             session.updatedAt = LocalDateTime.now();
+            persist(session);
         }
     }
 
@@ -380,6 +475,7 @@ public class GuestRequestService {
             session.demo = true;
             session.demoProviderEmail = providerInfo.getEmail();
             sessions.put(requestId, session);
+            persist(session);
 
             WebSocketDto.OutgoingMessage wsMessage = WebSocketDto.OutgoingMessage.builder()
                     .id(System.currentTimeMillis() + i)
@@ -569,7 +665,8 @@ public class GuestRequestService {
                 session.notifiedProviders,
                 session.createdAt,
                 session.updatedAt,
-                new ArrayList<>(session.responses)
+                new ArrayList<>(session.responses),
+                session.acceptedResponseId
         );
     }
 
@@ -587,6 +684,7 @@ public class GuestRequestService {
         private final LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private final List<GuestRequestResponseDto> responses;
+        private UUID acceptedResponseId;
         private boolean demo = false;
         private String demoProviderEmail;
 

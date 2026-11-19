@@ -59,6 +59,11 @@ public class LocalSearchServer {
 
     @Bean ProfileRepository profileRepository() { return mock(ProfileRepository.class); }
     @Bean WebPushService webPushService() { return mock(WebPushService.class); }
+    @Bean GuestRequestStore guestRequestStore() {
+        GuestRequestStore store = mock(GuestRequestStore.class);
+        when(store.loadAll()).thenReturn(List.of());
+        return store;
+    }
 
     @Bean ProfileService profileService() {
         ProfileService service = mock(ProfileService.class);

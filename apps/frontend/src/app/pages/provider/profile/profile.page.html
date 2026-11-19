@@ -132,8 +132,13 @@
             <ion-spinner name="crescent"></ion-spinner>
           </div>
 
+          <div *ngIf="categoryError" role="alert" class="categories-empty">
+            <p>{{ categoryError }}</p>
+            <ion-button size="small" fill="outline" (click)="retryCategories()">Reintentar</ion-button>
+          </div>
+
           <!-- View Mode: Show selected categories -->
-          <div *ngIf="!loadingCategories && !isEditMode">
+          <div *ngIf="!loadingCategories && !categoryError && !isEditMode">
             <div class="categories-list" *ngIf="selectedCategories.length > 0">
               <ion-chip *ngFor="let categoryId of selectedCategories" color="primary">
                 <ion-label>{{ getCategoryName(categoryId) }}</ion-label>
@@ -145,7 +150,7 @@
           </div>
 
           <!-- Edit Mode: Show all categories to select -->
-          <div *ngIf="!loadingCategories && isEditMode" class="categories-grid">
+          <div *ngIf="!loadingCategories && !categoryError && isEditMode" class="categories-grid">
             <div
               *ngFor="let category of availableCategories"
               class="category-card"
@@ -160,7 +165,7 @@
             </div>
           </div>
 
-          <p class="categories-hint" *ngIf="isEditMode && selectedCategories.length === 0">
+          <p class="categories-hint" *ngIf="isEditMode && selectedCategories.length === 0 && !categoryError">
             <ion-icon name="warning-outline" color="warning"></ion-icon>
             Selecciona al menos una categoría
           </p>
@@ -174,7 +179,7 @@
         </ion-button>
         <ion-button
           expand="block"
-          [disabled]="profileForm.invalid || isSaving"
+          [disabled]="profileForm.invalid || isSaving || loadingCategories || !!categoryError"
           (click)="saveProfile()">
           <ion-icon slot="start" name="save-outline"></ion-icon>
           {{ isSaving ? 'Guardando...' : 'Guardar Cambios' }}

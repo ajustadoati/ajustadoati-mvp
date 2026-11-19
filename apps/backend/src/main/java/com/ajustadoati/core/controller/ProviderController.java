@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/providers")
@@ -29,6 +30,41 @@ public class ProviderController {
     private final ProfileService profileService;
     private final GuestRequestService guestRequestService;
     private final ProfileRepository profileRepository;
+
+    @GetMapping("/accepted-guest-requests")
+    public ResponseEntity<ApiResponse<List<GuestRequestDto>>> getAcceptedGuestRequests(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("No autenticado"));
+        }
+        Optional<Profile> profile = profileRepository.findByUsernameOrEmailWithCategories(
+                authentication.getName(), authentication.getName());
+        if (profile.isEmpty() || !Boolean.TRUE.equals(profile.get().getIsProvider())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Solo proveedores pueden ver trabajos aceptados"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(guestRequestService.getAcceptedForProvider(profile.get().getEmail())));
+    }
+
+    @PostMapping("/guest-requests/{requestId}/complete")
+    public ResponseEntity<ApiResponse<GuestRequestDto>> completeGuestRequest(
+            @PathVariable UUID requestId, Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("No autenticado"));
+        }
+        Optional<Profile> profile = profileRepository.findByUsernameOrEmailWithCategories(
+                authentication.getName(), authentication.getName());
+        if (profile.isEmpty() || !Boolean.TRUE.equals(profile.get().getIsProvider())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Solo proveedores pueden completar trabajos"));
+        }
+        try {
+            return ResponseEntity.ok(ApiResponse.success(guestRequestService.completeRequest(requestId, profile.get().getEmail())));
+        } catch (SecurityException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(exception.getMessage()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(exception.getMessage()));
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(exception.getMessage()));
+        }
+    }
     
     /**
      * Returns the guest-request backlog the current provider still needs to

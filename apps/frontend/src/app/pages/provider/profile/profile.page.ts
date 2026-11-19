@@ -31,6 +31,7 @@ export class ProviderProfilePage implements OnInit {
   availableCategories: Category[] = [];
   selectedCategories: number[] = [];
   loadingCategories = false;
+  categoryError = '';
 
   constructor(
     private fb: FormBuilder,
@@ -66,23 +67,22 @@ export class ProviderProfilePage implements OnInit {
 
   private async loadCategories() {
     this.loadingCategories = true;
+    this.categoryError = '';
     try {
       this.availableCategories = await firstValueFrom(this.categoryService.getCategories());
+      if (this.availableCategories.length === 0) throw new Error('No categories returned from API');
       console.log('Categories loaded:', this.availableCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
-      // Fallback categories
-      this.availableCategories = [
-        { id: 1, name: 'Electrónicos', description: '' },
-        { id: 2, name: 'Electrodomésticos', description: '' },
-        { id: 3, name: 'Automotriz', description: '' },
-        { id: 4, name: 'Hogar', description: '' },
-        { id: 5, name: 'Tecnología', description: '' },
-        { id: 6, name: 'Otros', description: '' }
-      ];
+      this.availableCategories = [];
+      this.categoryError = 'No se pudieron cargar las categorías. Inténtalo de nuevo.';
     } finally {
       this.loadingCategories = false;
     }
+  }
+
+  retryCategories() {
+    void this.loadCategories();
   }
 
   getCategoryName(categoryId: number): string {
@@ -183,6 +183,11 @@ export class ProviderProfilePage implements OnInit {
   }
 
   async saveProfile() {
+    if (this.categoryError || this.loadingCategories) {
+      await this.showToast('Espera a que carguen las categorías para guardar el perfil', 'warning');
+      return;
+    }
+
     if (this.profileForm.invalid) {
       this.markFormGroupTouched();
       await this.showToast('Revisa los campos requeridos', 'warning');

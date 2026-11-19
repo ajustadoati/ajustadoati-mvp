@@ -23,6 +23,8 @@ interface BackendGuestRequest {
   maxDistanceKm: number;
   status: string;
   createdAt: string;
+  acceptedResponseId?: string;
+  responses?: { id: string; providerEmail: string; providerName: string; message: string }[];
 }
 
 export type ProviderResponseStatus = 'sent' | 'accepted' | 'expired';
@@ -98,6 +100,30 @@ export class ProviderWorkspaceService {
       });
     } catch (err) {
       console.warn('Failed to fetch pending request backlog:', err);
+    }
+  }
+
+  async fetchAcceptedJob(): Promise<void> {
+    if (this.activeJobSubject.value) return;
+    try {
+      const response = await firstValueFrom(
+        this.http.get<{ data: BackendGuestRequest[] }>(`${environment.baseUrl}/providers/accepted-guest-requests`)
+      );
+      if (this.activeJobSubject.value) return;
+      const request = response?.data?.[0];
+      if (!request) return;
+      this.setActiveJob({
+        id: `job_${request.id}`,
+        requestId: request.id,
+        clientName: request.guestRef.startsWith('guest+') ? 'Cliente invitado' : request.guestRef,
+        clientLocation: { latitude: request.latitude, longitude: request.longitude },
+        categoryName: request.categoryName,
+        description: request.message,
+        status: JobStatus.EN_ROUTE,
+        acceptedAt: new Date(request.createdAt)
+      });
+    } catch (error) {
+      console.warn('No se pudo recuperar el trabajo aceptado:', error);
     }
   }
 

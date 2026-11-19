@@ -36,6 +36,8 @@ describe('SearchRequestService backend classification', () => {
     const session = await pending;
     expect(session.searchRequest.categoryId).toBe('42');
     expect(session.searchRequest.id).toBe('server-request');
+    expect(JSON.parse(localStorage.getItem('ajustadoati_guest_search_v1') || '{}').requestId)
+      .toBe('server-request');
   });
 
   it('does not publish twice on a double click', async () => {
@@ -64,5 +66,75 @@ describe('SearchRequestService backend classification', () => {
       { status: 422, statusText: 'Unprocessable Entity' });
     await expectAsync(pending).toBeRejectedWithError('Describe que necesitas reparar');
     expect(service.hasActiveSearch()).toBeFalse();
+  });
+
+  it('restores an accepted guest search after a page reload', async () => {
+    const savedId = '00000000-0000-4000-8000-000000000001';
+    localStorage.setItem('ajustadoati_guest_search_v1', JSON.stringify({
+      requestId: savedId, providers: [], acceptedResponseId: 'response-1'
+    }));
+    const restoring = service.restoreGuestSearchSession();
+    http.expectOne(`${environment.baseUrl}/guest-requests/${savedId}`).flush({
+      success: true,
+      data: {
+        ...response.data.request,
+        id: savedId,
+        status: 'accepted',
+        responses: [{
+          id: 'response-1', requestId: savedId, providerName: 'Richard',
+          providerEmail: 'provider@example.test', message: 'Puedo ayudar',
+          latitude: 41.18, longitude: 1.45, createdAt: '2026-10-03T10:01:00'
+        }]
+      }
+    });
+
+    const restored = await restoring;
+    expect(restored?.searchRequest.status).toBe('accepted');
+    expect(restored?.acceptedResponse?.id).toBe('response-1');
+    expect(restored?.responses.length).toBe(1);
+  });
+
+  it('remembers which provider was chosen for a guest search', async () => {
+    const pending = service.createSearchRequest('Reparar grifo', { lat: 41.18, lng: 1.45 }, true);
+    http.expectOne(endpoint).flush({
+      success: true,
+      data: {
+        providers: [],
+        request: {
+          ...response.data.request,
+          responses: [{
+            id: 'response-1', requestId: 'server-request', providerName: 'Richard',
+            providerEmail: 'provider@example.test', message: 'Puedo ayudar',
+            createdAt: '2026-10-03T10:01:00'
+          }]
+        }
+      }
+    });
+    await pending;
+    service.acceptProviderResponse('response-1');
+
+    const stored = JSON.parse(localStorage.getItem('ajustadoati_guest_search_v1') || '{}');
+    expect(stored.acceptedResponseId).toBe('response-1');
+  });
+
+  it('restores a completed request and the selected provider from the backend', async () => {
+    const savedId = '00000000-0000-4000-8000-000000000002';
+    localStorage.setItem('ajustadoati_guest_search_v1', JSON.stringify({
+      requestId: savedId, providers: []
+    }));
+    const restoring = service.restoreGuestSearchSession();
+    http.expectOne(`${environment.baseUrl}/guest-requests/${savedId}`).flush({
+      success: true,
+      data: {
+        ...response.data.request, id: savedId, status: 'completed', acceptedResponseId: 'response-1',
+        responses: [{ id: 'response-1', requestId: savedId, providerName: 'Richard',
+          providerEmail: 'provider@example.test', message: 'He terminado',
+          createdAt: '2026-10-03T10:01:00' }]
+      }
+    });
+    const restored = await restoring;
+    expect(restored?.searchRequest.status).toBe('completed');
+    expect(restored?.acceptedResponse?.id).toBe('response-1');
+    expect(localStorage.getItem('ajustadoati_guest_search_v1')).toContain(savedId);
   });
 });

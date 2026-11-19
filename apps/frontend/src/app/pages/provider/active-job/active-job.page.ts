@@ -2,7 +2,9 @@ import { Component, OnInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { IonicModule, AlertController, ToastController } from '@ionic/angular';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 import { ProviderActiveJob, JobStatus } from '../../../interfaces/request.interface';
 import { ProviderWorkspaceService } from '../../../services/provider-workspace.service';
 
@@ -16,6 +18,7 @@ import { ProviderWorkspaceService } from '../../../services/provider-workspace.s
 })
 export class ActiveJobPage implements OnInit, OnDestroy {
   activeJob: ProviderActiveJob | null = null;
+  isCompleting = false;
 
   private subscriptions: Subscription[] = [];
 
@@ -23,6 +26,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
     private router: Router,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
+    private http: HttpClient,
     private providerWorkspace: ProviderWorkspaceService
   ) {}
 
@@ -130,9 +134,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
         },
         {
           text: 'Si, completado',
-          handler: async () => {
-            await this.completeJob();
-          }
+          handler: () => { void this.completeJob(); }
         }
       ]
     });
@@ -154,19 +156,31 @@ export class ActiveJobPage implements OnInit, OnDestroy {
   }
 
   private async completeJob() {
-    if (!this.activeJob) return;
+    if (!this.activeJob || this.isCompleting) return;
 
-    this.activeJob = {
-      ...this.activeJob,
-      status: JobStatus.COMPLETED,
-      completedAt: new Date()
-    };
+    this.isCompleting = true;
+    try {
+      await firstValueFrom(this.http.post(
+        `${environment.baseUrl}/providers/guest-requests/${this.activeJob.requestId}/complete`, {}
+      ));
 
-    this.providerWorkspace.updateActiveJob(this.activeJob);
-    this.providerWorkspace.completeActiveJob();
+      this.activeJob = {
+        ...this.activeJob,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date()
+      };
 
-    await this.showToast('Trabajo completado!', 'success');
-    this.router.navigate(['/provider/home']);
+      this.providerWorkspace.updateActiveJob(this.activeJob);
+      this.providerWorkspace.completeActiveJob();
+
+      await this.showToast('Trabajo completado', 'success');
+      await this.router.navigate(['/provider/home']);
+    } catch (error) {
+      console.error('No se pudo completar el trabajo:', error);
+      await this.showToast('No pudimos guardar el cierre. Inténtalo de nuevo.', 'danger');
+    } finally {
+      this.isCompleting = false;
+    }
   }
 
   private getStatusMessage(status: JobStatus): string {

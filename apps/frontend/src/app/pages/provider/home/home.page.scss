@@ -134,6 +134,24 @@ ion-content {
       }
     }
   }
+
+  .location-retry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.28);
+    font-size: 14px;
+    line-height: 1.4;
+
+    span { flex: 1 1 240px; }
+    ion-button { margin: 0; }
+  }
 }
 
 .stats-grid {

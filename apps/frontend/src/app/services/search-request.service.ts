@@ -61,6 +61,7 @@ interface GuestRequestApiResponse {
   createdAt: string;
   updatedAt: string;
   responses: GuestProviderApiResponse[];
+  acceptedResponseId?: string;
 }
 
 interface GuestProviderApiResponse {
@@ -75,10 +76,17 @@ interface GuestProviderApiResponse {
   createdAt: string;
 }
 
+interface StoredGuestSearch {
+  requestId: string;
+  providers: ProviderSearchResult[];
+  acceptedResponseId?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class SearchRequestService {
+  private readonly GUEST_SEARCH_KEY = 'ajustadoati_guest_search_v1';
   private currentSearchSession$ = new BehaviorSubject<SearchSession | null>(null);
   private incomingResponses$ = new Subject<ProviderResponse>();
   private searchTimeout: any;
@@ -162,6 +170,7 @@ export class SearchRequestService {
         notifiedProvidersCount: request.notifiedProviders || 0
       };
       this.currentSearchSession$.next(session);
+      if (isGuestSearch) this.saveGuestSearch(session);
       if (session.isActive) this.startGuestResponsePolling(request.id);
       return session;
     } catch (error: any) {
@@ -249,6 +258,7 @@ export class SearchRequestService {
   clearCurrentSession(): void {
     this.pendingSubmission = null;
     this.currentSearchSession$.next(null);
+    this.forgetGuestSearch();
 
     if (this.searchTimeout) {
       clearTimeout(this.searchTimeout);
@@ -283,14 +293,90 @@ export class SearchRequestService {
     return response.data as GuestRequestApiResponse;
   }
 
+  async restoreGuestSearchSession(): Promise<SearchSession | null> {
+    if (typeof localStorage === 'undefined') return null;
+    let raw: string | null;
+    try { raw = localStorage.getItem(this.GUEST_SEARCH_KEY); } catch { return null; }
+    if (!raw) return null;
+
+    let saved: StoredGuestSearch;
+    try {
+      saved = JSON.parse(raw);
+      if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(saved.requestId)
+        || !Array.isArray(saved.providers)) {
+        throw new Error('Invalid saved search');
+      }
+    } catch {
+      this.forgetGuestSearch();
+      return null;
+    }
+
+    try {
+      const request = await this.fetchGuestRequestFromBackend(saved.requestId);
+      if (request.status === 'expired') {
+        this.forgetGuestSearch();
+        return null;
+      }
+
+      const responses = this.mapGuestResponses(request.responses || []);
+      const session: SearchSession = {
+        searchRequest: {
+          id: request.id,
+          productName: request.message,
+          categoryId: String(request.categoryId),
+          categoryName: request.categoryName,
+          userLatitude: request.latitude,
+          userLongitude: request.longitude,
+          timestamp: new Date(request.createdAt),
+          status: this.mapGuestRequestStatus(request.status, 'pending')
+        },
+        responses,
+        isActive: !['accepted', 'expired', 'completed'].includes(request.status),
+        providers: saved.providers,
+        acceptedResponse: ['accepted', 'completed'].includes(request.status)
+          ? responses.find(response => response.id === request.acceptedResponseId || response.id === saved.acceptedResponseId)
+          : undefined,
+        isGuestSearch: true,
+        serverManaged: true,
+        notifiedProvidersCount: request.notifiedProviders || 0
+      };
+      this.currentSearchSession$.next(session);
+      if (session.isActive || request.status === 'accepted') this.startGuestResponsePolling(request.id);
+      return session;
+    } catch (error) {
+      console.warn('Could not restore guest search:', error);
+      return null;
+    }
+  }
+
+  private saveGuestSearch(session: SearchSession): void {
+    if (typeof localStorage === 'undefined') return;
+    const stored: StoredGuestSearch = {
+      requestId: session.searchRequest.id,
+      providers: session.providers,
+      acceptedResponseId: session.acceptedResponse?.id
+    };
+    try {
+      localStorage.setItem(this.GUEST_SEARCH_KEY, JSON.stringify(stored));
+    } catch (error) {
+      // Browser storage is optional; a successful backend request must still succeed.
+      console.warn('Could not remember guest search locally:', error);
+    }
+  }
+
+  private forgetGuestSearch(): void {
+    if (typeof localStorage === 'undefined') return;
+    try { localStorage.removeItem(this.GUEST_SEARCH_KEY); } catch { /* Storage may be disabled. */ }
+  }
+
   private startGuestResponsePolling(requestId: string): void {
     this.stopGuestResponsePolling();
 
     this.guestResponsePollingTimer = setInterval(async () => {
       try {
         const currentSession = this.currentSearchSession$.value;
-        // Stop polling when session ends or offer was accepted
-        if (!currentSession || currentSession.searchRequest.id !== requestId || !currentSession.isActive) {
+        if (!currentSession || currentSession.searchRequest.id !== requestId
+          || (!currentSession.isActive && currentSession.searchRequest.status !== 'accepted')) {
           this.stopGuestResponsePolling();
           return;
         }
@@ -299,7 +385,8 @@ export class SearchRequestService {
 
         // Re-check after async call in case state changed while awaiting
         const sessionAfterFetch = this.currentSearchSession$.value;
-        if (!sessionAfterFetch || sessionAfterFetch.searchRequest.id !== requestId || !sessionAfterFetch.isActive) {
+        if (!sessionAfterFetch || sessionAfterFetch.searchRequest.id !== requestId
+          || (!sessionAfterFetch.isActive && sessionAfterFetch.searchRequest.status !== 'accepted')) {
           this.stopGuestResponsePolling();
           return;
         }
@@ -308,6 +395,9 @@ export class SearchRequestService {
         const nextSession: SearchSession = {
           ...sessionAfterFetch,
           responses: newResponses,
+          acceptedResponse: ['accepted', 'completed'].includes(guestRequest.status)
+            ? newResponses.find(response => response.id === guestRequest.acceptedResponseId) || sessionAfterFetch.acceptedResponse
+            : undefined,
           isActive: !['expired', 'completed', 'accepted'].includes(guestRequest.status),
           notifiedProvidersCount: guestRequest.notifiedProviders || sessionAfterFetch.notifiedProvidersCount || 0
         };
@@ -326,6 +416,9 @@ export class SearchRequestService {
             status: this.mapGuestRequestStatus(guestRequest.status, nextSession.searchRequest.status)
           }
         });
+        if (guestRequest.status === 'completed' || guestRequest.status === 'expired') {
+          this.stopGuestResponsePolling();
+        }
       } catch (error) {
         console.error('❌ Error polling guest responses:', error);
       }
@@ -514,6 +607,8 @@ export class SearchRequestService {
     };
 
     this.currentSearchSession$.next(updatedSession);
+    if (updatedSession.isGuestSearch) this.saveGuestSearch(updatedSession);
+    if (updatedSession.serverManaged) this.startGuestResponsePolling(updatedSession.searchRequest.id);
 
     // Clear the timeout since we've accepted
     if (this.searchTimeout) {

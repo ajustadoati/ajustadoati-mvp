@@ -155,7 +155,8 @@ public class CommonDto {
         Integer notifiedProviders,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        List<GuestRequestResponseDto> responses
+        List<GuestRequestResponseDto> responses,
+        UUID acceptedResponseId
     ) {}
 
     public record ApiResponse<T>(

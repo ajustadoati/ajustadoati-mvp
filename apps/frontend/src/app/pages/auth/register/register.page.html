@@ -81,7 +81,7 @@
             type="tel"
             formControlName="phone"
             autocomplete="tel"
-            placeholder="+56 9 1234 5678"
+            placeholder="+58 412 123 4567"
             label="Teléfono"
             labelPlacement="floating"
           ></ion-input>
@@ -160,6 +160,13 @@
           </div>
         </div>
 
+        <div *ngIf="categoryError" class="category-load-error" role="alert">
+          <p>{{ categoryError }}</p>
+          <ion-button type="button" fill="outline" size="small" (click)="retryCategories()">
+            Reintentar
+          </ion-button>
+        </div>
+
         <!-- Terms and Conditions -->
         <ion-item class="form-item terms-item" lines="none">
           <ion-checkbox formControlName="acceptTerms" slot="start"></ion-checkbox>
@@ -176,7 +183,7 @@
           expand="block"
           type="submit"
           class="register-button"
-          [disabled]="isLoading || !userLocation || selectedCategories.length === 0"
+          [disabled]="isLoading || loadingCategories || !!categoryError || !userLocation || selectedCategories.length === 0"
         >
           <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
           <span *ngIf="!isLoading">Crear cuenta</span>
@@ -185,7 +192,7 @@
         <p class="submit-hint" *ngIf="!userLocation">
           Comparte tu ubicación arriba para activar el botón de registro.
         </p>
-        <p class="submit-hint" *ngIf="userLocation && selectedCategories.length === 0">
+        <p class="submit-hint" *ngIf="userLocation && selectedCategories.length === 0 && !categoryError">
           Selecciona al menos una categoría para activar el botón de registro.
         </p>
       </form>

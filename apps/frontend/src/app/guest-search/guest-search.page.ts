@@ -47,10 +47,12 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   locationErrorMessage = '';
   searchErrorMessage = '';
   isMapReady = false;
+  isAcceptingOffer = false;
 
   private subscriptions: Subscription[] = [];
   private map: any = null;
   private markers: any[] = [];
+  private providerMarkers = new Map<string, any>();
   private lastMapSignature = '';
   private renderedResponseIds = new Set<string>();
 
@@ -86,6 +88,14 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     await this.ensureGuestUser();
     this.loadGuestStats();
     this.setupSearchSubscriptions();
+    const restored = await this.searchRequestService.restoreGuestSearchSession();
+    if (restored) {
+      this.userLocation = {
+        lat: restored.searchRequest.userLatitude,
+        lng: restored.searchRequest.userLongitude
+      };
+      this.serviceDescription = restored.searchRequest.productName;
+    }
   }
 
   ngOnDestroy() {
@@ -142,13 +152,21 @@ export class GuestSearchPage implements OnInit, OnDestroy {
     this.guestStats = this.guestUserService.getGuestStats();
   }
 
-  openSearchModal() {
+  openSearchModal(example?: string) {
+    if (example) {
+      this.serviceDescription = example;
+      this.userLocation = null;
+    }
     this.isSearchModalOpen = true;
-    this.modalStep = 'form';
+    this.modalStep = !example && this.currentSearchSession?.isGuestSearch ? 'results' : 'form';
     this.searchErrorMessage = '';
     this.locationErrorMessage = '';
     this.lastMapSignature = '';
     this.clearMap();
+    if (this.modalStep === 'results' && this.currentSearchSession) {
+      this.lastMapSignature = this.buildMapSignature(this.currentSearchSession);
+      setTimeout(() => this.initializeResultsMap(), 250);
+    }
     this.analytics.track('guest_open_search_modal');
   }
 
@@ -163,6 +181,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
   backToForm() {
     this.modalStep = 'form';
+    this.userLocation = null;
     this.searchErrorMessage = '';
     this.lastMapSignature = '';
     this.clearMap();
@@ -271,8 +290,8 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
   get locationText(): string {
     if (this.isLocationLoading) return 'Solicitando acceso al GPS...';
-    if (!this.userLocation) return 'La pediremos cuando pulses "Usar mi ubicacion"';
-    return `${this.userLocation.lat.toFixed(4)}, ${this.userLocation.lng.toFixed(4)}`;
+    if (!this.userLocation) return 'Solo para encontrar proveedores cerca de ti';
+    return 'Buscaremos profesionales cerca de ti';
   }
 
   get providersCount(): number {
@@ -297,6 +316,10 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
   trackProviderById(_index: number, provider: any): string {
     return provider?.id;
+  }
+
+  showResponse(responseId: string): void {
+    document.getElementById(`guest-response-${responseId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   private rebuildRespondedProviders(): void {
@@ -379,7 +402,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
         const infoWindow = new google.maps.InfoWindow({
           content: `
             <div style="padding: 8px;">
-              <strong>${provider.name}</strong>
+              <strong>${this.escapeHtml(provider.name)}</strong>
               ${location.distance ? `<div style="margin-top: 4px;">${location.distance.toFixed(1)} km</div>` : ''}
             </div>
           `
@@ -387,6 +410,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
 
         providerMarker.addListener('click', () => infoWindow.open(this.map, providerMarker));
         this.markers.push(providerMarker);
+        this.providerMarkers.set(provider.id, providerMarker);
       });
     }
 
@@ -411,7 +435,16 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   private addNewResponseMarkers(session: SearchSession): void {
     (session.responses || [])
       .filter(r => !this.renderedResponseIds.has(r.id) && typeof r.latitude === 'number' && typeof r.longitude === 'number')
-      .forEach(r => this.addResponseMarkerToMap(r));
+      .forEach(r => {
+        const provider = session.providers.find(p => this.matchesResponseToProvider(p, r));
+        const nearbyMarker = provider && this.providerMarkers.get(provider.id);
+        if (nearbyMarker) {
+          nearbyMarker.setMap(null);
+          this.markers = this.markers.filter(marker => marker !== nearbyMarker);
+          this.providerMarkers.delete(provider.id);
+        }
+        this.addResponseMarkerToMap(r);
+      });
   }
 
   private addResponseMarkerToMap(response: any): void {
@@ -459,8 +492,8 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   private buildResponseInfoWindowContent(response: any, whatsappUrl: string | null): string {
-    const name = response.providerName || 'Proveedor';
-    const safeMessage = (response.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const name = this.escapeHtml(response.providerName || 'Proveedor');
+    const safeMessage = this.escapeHtml(response.message || '');
 
     const chips = [
       response.estimatedTime
@@ -507,6 +540,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   private clearMap() {
     this.markers.forEach(marker => marker?.setMap?.(null));
     this.markers = [];
+    this.providerMarkers.clear();
     this.map = null;
     this.isMapReady = false;
     this.renderedResponseIds.clear();
@@ -538,7 +572,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   get hasAcceptedOffer(): boolean {
-    return !!this.currentSearchSession?.acceptedResponse;
+    return ['accepted', 'completed'].includes(this.currentSearchSession?.searchRequest.status || '');
   }
 
   isResponseAccepted(responseId: string): boolean {
@@ -546,45 +580,70 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   async acceptGuestOffer(response: any) {
+    if (this.isAcceptingOffer) return;
     const priceInfo = response.price ? `\nPrecio: $${response.price.toLocaleString()}` : '';
     const timeInfo = response.estimatedTime ? `\nTiempo estimado: ${response.estimatedTime} min` : '';
 
     const alert = await this.alertController.create({
-      header: 'Aceptar oferta',
-      message: `¿Quieres aceptar la oferta de ${response.providerName}?${priceInfo}${timeInfo}`,
+      header: 'Elegir proveedor',
+      message: `¿Quieres elegir a ${response.providerName}? Le avisaremos y podrás contactarlo.${priceInfo}${timeInfo}`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
-          text: 'Aceptar',
-          handler: () => this.confirmGuestAccept(response)
+          text: 'Elegir',
+          handler: () => { void this.confirmGuestAccept(response); }
         }
       ]
     });
     await alert.present();
   }
 
-  private confirmGuestAccept(response: any): void {
-    this.analytics.track('guest_accept_offer');
-    // Update local session state immediately so UI reflects acceptance
-    this.searchRequestService.acceptProviderResponse(response.id);
-    this.showToast('¡Oferta aceptada! Contacta al proveedor para coordinar.', 'success');
-
-    // Notify backend so it forwards offer_accepted to the provider via WebSocket
+  private async confirmGuestAccept(response: any): Promise<void> {
     const requestId = this.currentSearchSession?.searchRequest.id;
-    if (requestId) {
-      this.searchRequestService
-        .acceptGuestResponse(requestId, response.id)
-        .catch(err => console.warn('Could not notify provider of acceptance:', err));
+    if (!requestId) return;
+
+    this.isAcceptingOffer = true;
+    try {
+      await this.searchRequestService.acceptGuestResponse(requestId, response.id);
+      this.searchRequestService.acceptProviderResponse(response.id);
+      this.analytics.track('guest_accept_offer');
+      await this.showToast('Proveedor elegido. Contacta para coordinar el servicio.', 'success');
+    } catch (error) {
+      console.error('Could not accept provider response:', error);
+      this.searchErrorMessage = 'No pudimos elegir al proveedor. Inténtalo de nuevo.';
+    } finally {
+      this.isAcceptingOffer = false;
     }
   }
 
-  getWhatsAppUrl(response: { providerPhone?: string; providerName?: string }): string | null {
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char] || char));
+  }
+
+  getWhatsAppUrl(response: { providerPhone?: string; providerName?: string; latitude?: number; longitude?: number }): string | null {
     if (!response.providerPhone) {
       return null;
     }
 
-    const cleanPhone = response.providerPhone.replace(/[^\d]/g, '');
-    if (!cleanPhone) {
+    const phone = response.providerPhone.trim();
+    let cleanPhone = phone.replace(/[^\d]/g, '');
+    const inSpain = typeof response.latitude === 'number' && typeof response.longitude === 'number'
+      && ((response.latitude >= 35.8 && response.latitude <= 43.9 && response.longitude >= -9.5 && response.longitude <= 4.5)
+        || (response.latitude >= 27.5 && response.latitude <= 29.5 && response.longitude >= -18.5 && response.longitude <= -13.2));
+    const inVenezuela = typeof response.latitude === 'number' && typeof response.longitude === 'number'
+      && response.latitude >= 0.5 && response.latitude <= 12.5 && response.longitude >= -73.5 && response.longitude <= -59.5;
+
+    if (phone.startsWith('00')) {
+      cleanPhone = cleanPhone.slice(2);
+    } else if (!phone.startsWith('+') && inSpain && /^[6789]\d{8}$/.test(cleanPhone)) {
+      cleanPhone = `34${cleanPhone}`;
+    } else if (!phone.startsWith('+') && inVenezuela && /^04\d{9}$/.test(cleanPhone)) {
+      cleanPhone = `58${cleanPhone.slice(1)}`;
+    }
+
+    if (!/^[1-9]\d{10,14}$/.test(cleanPhone)) {
       return null;
     }
 
