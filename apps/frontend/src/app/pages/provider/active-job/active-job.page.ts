@@ -4,6 +4,7 @@ import { IonicModule, AlertController, ToastController } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { ProviderActiveJob, JobStatus } from '../../../interfaces/request.interface';
 import { ProviderWorkspaceService } from '../../../services/provider-workspace.service';
@@ -61,12 +62,8 @@ export class ActiveJobPage implements OnInit, OnDestroy {
 
     const { latitude, longitude } = this.activeJob.clientLocation;
 
-    // Try Google Maps first, fallback to generic maps
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    const wazeUrl = `https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`;
-
-    // Open Google Maps
-    window.open(googleMapsUrl, '_blank');
+    window.location.assign(googleMapsUrl);
   }
 
   async openWaze() {
@@ -74,7 +71,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
 
     const { latitude, longitude } = this.activeJob.clientLocation;
     const wazeUrl = `https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`;
-    window.open(wazeUrl, '_blank');
+    window.location.assign(wazeUrl);
   }
 
   async callClient() {
@@ -160,10 +157,18 @@ export class ActiveJobPage implements OnInit, OnDestroy {
 
     this.isCompleting = true;
     try {
-      await firstValueFrom(this.http.post(
+      const response = await firstValueFrom(this.http.post<{ success: boolean; message?: string }>(
         `${environment.baseUrl}/providers/guest-requests/${this.activeJob.requestId}/complete`, {}
       ));
+      if (!response?.success) throw new Error(response?.message || 'El servidor no confirmó el cierre.');
+    } catch (error) {
+      console.error('No se pudo completar el trabajo en el backend:', error);
+      await this.showToast(this.completionErrorMessage(error), 'danger');
+      this.isCompleting = false;
+      return;
+    }
 
+    try {
       this.activeJob = {
         ...this.activeJob,
         status: JobStatus.COMPLETED,
@@ -176,11 +181,23 @@ export class ActiveJobPage implements OnInit, OnDestroy {
       await this.showToast('Trabajo completado', 'success');
       await this.router.navigate(['/provider/home']);
     } catch (error) {
-      console.error('No se pudo completar el trabajo:', error);
-      await this.showToast('No pudimos guardar el cierre. Inténtalo de nuevo.', 'danger');
+      console.error('El cierre se guardó en el servidor, pero falló la actualización local:', error);
+      await this.showToast('El trabajo se cerró en el servidor. Recarga la pantalla para actualizarla.', 'warning');
     } finally {
       this.isCompleting = false;
     }
+  }
+
+  private completionErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 401) return 'Tu sesión expiró. Inicia sesión y vuelve a intentarlo.';
+      if (error.status === 403) return 'Esta solicitud no pertenece a tu cuenta de proveedor.';
+      if (error.status === 404) return 'La solicitud no existe en el servidor. Actualiza la pantalla.';
+      if (error.status === 409) return 'La solicitud todavía no consta como aceptada. Actualiza la pantalla.';
+      if (error.status === 0) return 'No pudimos conectar. Comprueba la red y vuelve a intentarlo.';
+      return error.error?.message || 'El servidor no pudo guardar el cierre. Inténtalo de nuevo.';
+    }
+    return error instanceof Error ? error.message : 'No pudimos guardar el cierre. Inténtalo de nuevo.';
   }
 
   private getStatusMessage(status: JobStatus): string {

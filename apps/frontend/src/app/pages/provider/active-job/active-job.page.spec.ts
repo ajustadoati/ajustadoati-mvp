@@ -1,4 +1,5 @@
 import { Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActiveJobPage } from './active-job.page';
 import { JobStatus, ProviderActiveJob } from '../../../interfaces/request.interface';
 
@@ -37,5 +38,31 @@ describe('ActiveJobPage completion', () => {
     expect(workspace.completeActiveJob).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
     expect(page.activeJob?.status).toBe(JobStatus.ON_SITE);
+  });
+
+  it('explains when the backend request is not accepted yet', async () => {
+    const error = new HttpErrorResponse({ status: 409 });
+    const { page, toast, workspace } = pageWith(throwError(() => error));
+    spyOn(console, 'error');
+
+    await (page as any).completeJob();
+
+    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: jasmine.stringMatching(/todavía no consta como aceptada/), color: 'danger'
+    }));
+  });
+
+  it('does not report a backend failure when only local history fails', async () => {
+    const { page, toast, workspace } = pageWith(of({ success: true }));
+    workspace.completeActiveJob.and.throwError('Storage full');
+    spyOn(console, 'error');
+
+    await (page as any).completeJob();
+
+    expect(page.activeJob?.status).toBe(JobStatus.COMPLETED);
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: jasmine.stringMatching(/se cerró en el servidor/), color: 'warning'
+    }));
   });
 });

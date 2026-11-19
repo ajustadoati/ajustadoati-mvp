@@ -1,6 +1,8 @@
 package com.ajustadoati.core.service;
 
 import com.ajustadoati.core.dto.CommonDto.GuestRequestCreateRequest;
+import com.ajustadoati.core.dto.CommonDto.GuestRequestDto;
+import com.ajustadoati.core.dto.CommonDto.GuestRequestResponseDto;
 import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Category;
 import com.ajustadoati.core.repository.CategoryRepository;
@@ -10,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +32,26 @@ class GuestRequestServiceTest {
 
     private GuestRequestService service() {
         return new GuestRequestService(connections, categories, profiles, mapper, push, store);
+    }
+
+    @Test
+    void failedCompletionSaveKeepsRequestAcceptedForRetry() {
+        UUID requestId = UUID.randomUUID();
+        UUID responseId = UUID.randomUUID();
+        LocalDateTime now = LocalDateTime.now();
+        var response = new GuestRequestResponseDto(responseId, requestId, "Proveedor",
+                "provider@example.test", null, "Disponible", 41.18, 1.45, now);
+        var request = new GuestRequestDto(requestId, "guest@example.test", 12, "Taxi", "Viaje",
+                41.18, 1.45, 50.0, "accepted", 1, now, now, List.of(response), responseId);
+        when(store.loadAll()).thenReturn(List.of(new GuestRequestStore.StoredRequest(request, false, null)));
+        doThrow(new IllegalStateException("Database unavailable")).when(store).save(any());
+
+        GuestRequestService service = service();
+        service.restoreRequests();
+
+        assertThrows(IllegalStateException.class, () -> service.completeRequest(requestId, "provider@example.test"));
+        assertEquals("accepted", service.getRequest(requestId).status());
+        assertEquals(now, service.getRequest(requestId).updatedAt());
     }
 
     @Test

@@ -34,4 +34,20 @@ describe('ProviderWorkspaceService accepted work recovery', () => {
     expect(service.getActiveJob()?.status).toBe(JobStatus.EN_ROUTE);
     expect(service.getActiveJob()?.clientName).toBe('Cliente invitado');
   });
+
+  it('removes a stale local job when the backend has no accepted work', async () => {
+    service.updateActiveJob({
+      id: 'job_old', requestId: 'old', clientName: 'Cliente',
+      clientLocation: { latitude: 41.18, longitude: 1.45 },
+      categoryName: 'Taxi', description: 'Viaje', status: JobStatus.ON_SITE,
+      acceptedAt: new Date()
+    });
+
+    const loading = service.fetchAcceptedJob();
+    http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({ data: [] });
+    await loading;
+
+    expect(service.getActiveJob()).toBeNull();
+    expect(localStorage.getItem('provider_active_job')).toBeNull();
+  });
 });

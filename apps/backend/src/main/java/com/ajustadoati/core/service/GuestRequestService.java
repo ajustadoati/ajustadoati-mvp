@@ -334,10 +334,19 @@ public class GuestRequestService {
             if ("completed".equals(session.status)) {
                 return toDto(session);
             }
+            UUID previousResponseId = session.acceptedResponseId;
+            LocalDateTime previousUpdatedAt = session.updatedAt;
             session.acceptedResponseId = selected.id();
             session.status = "completed";
             session.updatedAt = LocalDateTime.now();
-            persist(session);
+            try {
+                persist(session);
+            } catch (RuntimeException exception) {
+                session.acceptedResponseId = previousResponseId;
+                session.status = "accepted";
+                session.updatedAt = previousUpdatedAt;
+                throw exception;
+            }
             return toDto(session);
         }
     }

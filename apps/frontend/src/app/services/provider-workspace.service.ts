@@ -104,14 +104,20 @@ export class ProviderWorkspaceService {
   }
 
   async fetchAcceptedJob(): Promise<void> {
-    if (this.activeJobSubject.value) return;
     try {
+      const beforeFetch = this.activeJobSubject.value;
       const response = await firstValueFrom(
         this.http.get<{ data: BackendGuestRequest[] }>(`${environment.baseUrl}/providers/accepted-guest-requests`)
       );
-      if (this.activeJobSubject.value) return;
-      const request = response?.data?.[0];
-      if (!request) return;
+      if (this.activeJobSubject.value !== beforeFetch) return;
+      const existing = this.activeJobSubject.value;
+      const requests = response?.data || [];
+      const request = requests.find(item => item.id === existing?.requestId) || requests[0];
+      if (!request) {
+        if (existing) this.setActiveJob(null);
+        return;
+      }
+      if (existing?.requestId === request.id) return;
       this.setActiveJob({
         id: `job_${request.id}`,
         requestId: request.id,
