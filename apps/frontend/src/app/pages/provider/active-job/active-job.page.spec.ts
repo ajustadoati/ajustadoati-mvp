@@ -16,9 +16,13 @@ describe('ActiveJobPage completion', () => {
     const toast = { create: jasmine.createSpy().and.resolveTo({ present: () => Promise.resolve() }) };
     const http = { post: jasmine.createSpy().and.returnValue(postResult) };
     const workspace = {
-      updateActiveJob: jasmine.createSpy(), completeActiveJob: jasmine.createSpy()
+      updateActiveJob: jasmine.createSpy(), completeActiveJob: jasmine.createSpy(),
+      fetchAcceptedJob: jasmine.createSpy().and.resolveTo(true),
+      getActiveJob: jasmine.createSpy().and.returnValue(job),
+      ensureBelongsTo: jasmine.createSpy(), activeJob$: of(job)
     };
-    const page = new ActiveJobPage(router as any, {} as any, toast as any, http as any, workspace as any);
+    const page = new ActiveJobPage(router as any, {} as any, toast as any, http as any, workspace as any,
+      { currentUser: { email: 'provider@example.test' } } as any);
     page.activeJob = { ...job };
     return { page, router, toast, http, workspace };
   }
@@ -31,6 +35,13 @@ describe('ActiveJobPage completion', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/provider/home']);
   });
 
+  it('binds locally saved work to the signed-in provider on direct entry', () => {
+    const { page, workspace } = pageWith(of({ success: true }));
+    page.ngOnInit();
+    expect(workspace.ensureBelongsTo).toHaveBeenCalledWith('provider@example.test');
+    expect(workspace.fetchAcceptedJob).toHaveBeenCalled();
+  });
+
   it('keeps the job active when the backend rejects completion', async () => {
     const { page, workspace, router } = pageWith(throwError(() => new Error('Network error')));
     spyOn(console, 'error');
@@ -38,6 +49,33 @@ describe('ActiveJobPage completion', () => {
     expect(workspace.completeActiveJob).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
     expect(page.activeJob?.status).toBe(JobStatus.ON_SITE);
+  });
+
+  it('does not complete a locally saved job no longer accepted for this provider', async () => {
+    const { page, http, toast, workspace, router } = pageWith(of({ success: true }));
+    workspace.getActiveJob.and.returnValue(null);
+
+    await (page as any).completeJob();
+
+    expect(http.post).not.toHaveBeenCalled();
+    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/provider/home']);
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: jasmine.stringMatching(/ya no figura como aceptado/), color: 'warning'
+    }));
+    expect(page.isCompleting).toBeFalse();
+  });
+
+  it('keeps the local job when the server check fails', async () => {
+    const { page, http, toast, workspace } = pageWith(of({ success: true }));
+    workspace.fetchAcceptedJob.and.resolveTo(false);
+
+    await (page as any).completeJob();
+
+    expect(http.post).not.toHaveBeenCalled();
+    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({ color: 'danger' }));
+    expect(page.isCompleting).toBeFalse();
   });
 
   it('explains when the backend request is not accepted yet', async () => {

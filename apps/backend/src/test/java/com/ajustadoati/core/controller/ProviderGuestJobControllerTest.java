@@ -7,6 +7,7 @@ import com.ajustadoati.core.service.ProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -65,5 +66,17 @@ class ProviderGuestJobControllerTest {
         mvc.perform(get("/providers/accepted-guest-requests").principal(provider))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
         verify(requests).getAcceptedForProvider("provider@example.test");
+    }
+
+    @Test
+    void reportsDatabaseFailureWithoutClaimingCompletion() throws Exception {
+        when(profiles.findByUsernameOrEmailWithCategories("provider", "provider"))
+                .thenReturn(Optional.of(Profile.builder().email("provider@example.test").isProvider(true).build()));
+        when(requests.completeRequest(requestId, "provider@example.test"))
+                .thenThrow(new DataAccessResourceFailureException("Database unavailable"));
+
+        mvc.perform(post("/providers/guest-requests/{id}/complete", requestId).principal(provider))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }

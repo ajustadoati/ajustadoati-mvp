@@ -8,6 +8,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { ProviderActiveJob, JobStatus } from '../../../interfaces/request.interface';
 import { ProviderWorkspaceService } from '../../../services/provider-workspace.service';
+import { BackendAuthService } from '../../../services/backend-auth.service';
 
 @Component({
   selector: 'app-active-job',
@@ -28,12 +29,15 @@ export class ActiveJobPage implements OnInit, OnDestroy {
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
     private http: HttpClient,
-    private providerWorkspace: ProviderWorkspaceService
+    private providerWorkspace: ProviderWorkspaceService,
+    private auth: BackendAuthService
   ) {}
 
   ngOnInit() {
     console.log('Active Job page initialized');
+    this.providerWorkspace.ensureBelongsTo(this.auth.currentUser?.email);
     this.loadActiveJob();
+    void this.providerWorkspace.fetchAcceptedJob();
   }
 
   ngOnDestroy() {
@@ -156,33 +160,48 @@ export class ActiveJobPage implements OnInit, OnDestroy {
     if (!this.activeJob || this.isCompleting) return;
 
     this.isCompleting = true;
+    const requestId = this.activeJob.requestId;
     try {
-      const response = await firstValueFrom(this.http.post<{ success: boolean; message?: string }>(
-        `${environment.baseUrl}/providers/guest-requests/${this.activeJob.requestId}/complete`, {}
-      ));
-      if (!response?.success) throw new Error(response?.message || 'El servidor no confirmó el cierre.');
-    } catch (error) {
-      console.error('No se pudo completar el trabajo en el backend:', error);
-      await this.showToast(this.completionErrorMessage(error), 'danger');
-      this.isCompleting = false;
-      return;
-    }
+      try {
+        const refreshed = await this.providerWorkspace.fetchAcceptedJob();
+        if (!refreshed) {
+          await this.showToast('No pudimos comprobar el trabajo en el servidor. Comprueba tu conexión.', 'danger');
+          return;
+        }
+        if (this.providerWorkspace.getActiveJob()?.requestId !== requestId) {
+          await this.showToast('Este trabajo ya no figura como aceptado para tu cuenta. Revisa tus trabajos.', 'warning');
+          await this.router.navigate(['/provider/home']);
+          return;
+        }
+        const response = await firstValueFrom(this.http.post<{ success: boolean; message?: string }>(
+          `${environment.baseUrl}/providers/guest-requests/${requestId}/complete`, {}
+        ));
+        if (!response?.success) throw new Error(response?.message || 'El servidor no confirmó el cierre.');
+      } catch (error) {
+        console.error('No se pudo completar el trabajo en el backend:', error);
+        if (error instanceof HttpErrorResponse && [403, 404, 409].includes(error.status)) {
+          await this.providerWorkspace.fetchAcceptedJob();
+        }
+        await this.showToast(this.completionErrorMessage(error), 'danger');
+        return;
+      }
 
-    try {
-      this.activeJob = {
-        ...this.activeJob,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date()
-      };
+      try {
+        this.activeJob = {
+          ...this.activeJob!,
+          status: JobStatus.COMPLETED,
+          completedAt: new Date()
+        };
 
-      this.providerWorkspace.updateActiveJob(this.activeJob);
-      this.providerWorkspace.completeActiveJob();
+        this.providerWorkspace.updateActiveJob(this.activeJob);
+        this.providerWorkspace.completeActiveJob();
 
-      await this.showToast('Trabajo completado', 'success');
-      await this.router.navigate(['/provider/home']);
-    } catch (error) {
-      console.error('El cierre se guardó en el servidor, pero falló la actualización local:', error);
-      await this.showToast('El trabajo se cerró en el servidor. Recarga la pantalla para actualizarla.', 'warning');
+        await this.showToast('Trabajo completado', 'success');
+        await this.router.navigate(['/provider/home']);
+      } catch (error) {
+        console.error('El cierre se guardó en el servidor, pero falló la actualización local:', error);
+        await this.showToast('El trabajo se cerró en el servidor. Recarga la pantalla para actualizarla.', 'warning');
+      }
     } finally {
       this.isCompleting = false;
     }
@@ -194,6 +213,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
       if (error.status === 403) return 'Esta solicitud no pertenece a tu cuenta de proveedor.';
       if (error.status === 404) return 'La solicitud no existe en el servidor. Actualiza la pantalla.';
       if (error.status === 409) return 'La solicitud todavía no consta como aceptada. Actualiza la pantalla.';
+      if (error.status === 503) return 'No pudimos guardar el cierre en el servidor. Inténtalo de nuevo más tarde.';
       if (error.status === 0) return 'No pudimos conectar. Comprueba la red y vuelve a intentarlo.';
       return error.error?.message || 'El servidor no pudo guardar el cierre. Inténtalo de nuevo.';
     }

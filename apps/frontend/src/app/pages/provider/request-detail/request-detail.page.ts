@@ -291,7 +291,7 @@ ${formValues.estimatedCost ? `💰 Costo estimado: ${formValues.estimatedCost}` 
     if (!this.request) return;
 
     const url = `https://www.google.com/maps/dir/?api=1&destination=${this.request.latitude},${this.request.longitude}`;
-    window.open(url, '_blank');
+    window.location.assign(url);
   }
 
   private markFormGroupTouched() {

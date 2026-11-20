@@ -24,7 +24,7 @@ describe('ProviderWorkspaceService accepted work recovery', () => {
   it('restores a missed accepted job after opening the provider home', async () => {
     const loading = service.fetchAcceptedJob();
     http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({
-      data: [{ id: 'request-1', guestRef: 'guest+123@ajustadoati.local',
+      success: true, data: [{ id: 'request-1', guestRef: 'guest+123@ajustadoati.local',
         categoryId: 12, categoryName: 'Taxi', message: 'Ir a Tarragona',
         latitude: 41.18, longitude: 1.45, maxDistanceKm: 50,
         status: 'accepted', createdAt: '2026-11-18T10:00:00' }]
@@ -44,10 +44,25 @@ describe('ProviderWorkspaceService accepted work recovery', () => {
     });
 
     const loading = service.fetchAcceptedJob();
-    http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({ data: [] });
+    http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({ success: true, data: [] });
     await loading;
 
     expect(service.getActiveJob()).toBeNull();
     expect(localStorage.getItem('provider_active_job')).toBeNull();
+  });
+
+  it('keeps the local job when the server response is not confirmed', async () => {
+    service.updateActiveJob({
+      id: 'job_old', requestId: 'old', clientName: 'Cliente',
+      clientLocation: { latitude: 41.18, longitude: 1.45 },
+      categoryName: 'Taxi', description: 'Viaje', status: JobStatus.ON_SITE,
+      acceptedAt: new Date()
+    });
+
+    const loading = service.fetchAcceptedJob();
+    http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({ success: false });
+
+    expect(await loading).toBeFalse();
+    expect(service.getActiveJob()?.requestId).toBe('old');
   });
 });
