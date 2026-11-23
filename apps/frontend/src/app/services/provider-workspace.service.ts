@@ -27,7 +27,7 @@ interface BackendGuestRequest {
   responses?: { id: string; providerEmail: string; providerName: string; message: string }[];
 }
 
-export type ProviderResponseStatus = 'sent' | 'accepted' | 'expired';
+export type ProviderResponseStatus = 'sent' | 'accepted' | 'completed' | 'expired';
 
 export interface ProviderSentResponse {
   id: string;
@@ -65,6 +65,14 @@ export class ProviderWorkspaceService {
   private http = inject(HttpClient);
 
   constructor() {
+    const completedIds = new Set(this.readJobHistory().map(job => job.requestId));
+    const responses = this.sentResponsesSubject.value.map(item =>
+      completedIds.has(item.request.requestId) && item.status !== 'completed'
+        ? { ...item, status: 'completed' as const } : item
+    );
+    if (responses.some((item, index) => item !== this.sentResponsesSubject.value[index])) {
+      this.setSentResponses(responses);
+    }
     // Drop stale requests persisted in localStorage (provider may have been
     // offline when the backend broadcast the expiration), then keep pruning.
     this.pruneExpiredRequests();
@@ -113,6 +121,14 @@ export class ProviderWorkspaceService {
       if (this.activeJobSubject.value !== beforeFetch) return false;
       const existing = this.activeJobSubject.value;
       const requests = response.data;
+      const acceptedIds = new Set(requests.map(item => item.id));
+      const updatedResponses = this.sentResponsesSubject.value.map(item =>
+        item.request.requestId && acceptedIds.has(item.request.requestId) && item.status === 'sent'
+          ? { ...item, status: 'accepted' as const } : item
+      );
+      if (updatedResponses.some((item, index) => item !== this.sentResponsesSubject.value[index])) {
+        this.setSentResponses(updatedResponses);
+      }
       const request = requests.find(item => item.id === existing?.requestId) || requests[0];
       if (!request) {
         if (existing) this.setActiveJob(null);
@@ -311,6 +327,9 @@ export class ProviderWorkspaceService {
 
     const history = this.readJobHistory();
     this.writeArray(JOB_HISTORY_KEY, [historyEntry, ...history]);
+    this.setSentResponses(this.sentResponsesSubject.value.map(item =>
+      item.request.requestId === activeJob.requestId ? { ...item, status: 'completed' as const } : item
+    ));
     this.setActiveJob(null);
 
     return historyEntry;

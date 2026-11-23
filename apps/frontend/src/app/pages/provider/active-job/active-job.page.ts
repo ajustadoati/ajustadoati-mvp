@@ -162,17 +162,12 @@ export class ActiveJobPage implements OnInit, OnDestroy {
     this.isCompleting = true;
     const requestId = this.activeJob.requestId;
     try {
+      if (!this.auth.isAuthenticated()) {
+        await this.showToast('Tu sesión expiró. Inicia sesión de nuevo para cerrar este trabajo.', 'warning');
+        await this.router.navigate(['/auth/login']);
+        return;
+      }
       try {
-        const refreshed = await this.providerWorkspace.fetchAcceptedJob();
-        if (!refreshed) {
-          await this.showToast('No pudimos comprobar el trabajo en el servidor. Comprueba tu conexión.', 'danger');
-          return;
-        }
-        if (this.providerWorkspace.getActiveJob()?.requestId !== requestId) {
-          await this.showToast('Este trabajo ya no figura como aceptado para tu cuenta. Revisa tus trabajos.', 'warning');
-          await this.router.navigate(['/provider/home']);
-          return;
-        }
         const response = await firstValueFrom(this.http.post<{ success: boolean; message?: string }>(
           `${environment.baseUrl}/providers/guest-requests/${requestId}/complete`, {}
         ));
@@ -210,7 +205,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
   private completionErrorMessage(error: unknown): string {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) return 'Tu sesión expiró. Inicia sesión y vuelve a intentarlo.';
-      if (error.status === 403) return 'Esta solicitud no pertenece a tu cuenta de proveedor.';
+      if (error.status === 403) return error.error?.message || 'No se pudo verificar tu sesión. Inicia sesión de nuevo.';
       if (error.status === 404) return 'La solicitud no existe en el servidor. Actualiza la pantalla.';
       if (error.status === 409) return 'La solicitud todavía no consta como aceptada. Actualiza la pantalla.';
       if (error.status === 503) return 'No pudimos guardar el cierre en el servidor. Inténtalo de nuevo más tarde.';

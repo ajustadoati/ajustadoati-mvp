@@ -26,7 +26,10 @@
       <div class="hero-actions">
         <ion-button size="large" class="hero-primary" (click)="openSearchModal()">
           <ion-icon name="search-outline" slot="start"></ion-icon>
-          {{ currentSearchSession?.isGuestSearch ? 'Ver mi solicitud' : 'Buscar ahora' }}
+          Buscar ahora
+        </ion-button>
+        <ion-button *ngIf="currentSearchSession?.isGuestSearch" size="large" fill="outline" class="hero-secondary" (click)="openExistingSearchModal()">
+          Ver mi solicitud
         </ion-button>
       </div>
 

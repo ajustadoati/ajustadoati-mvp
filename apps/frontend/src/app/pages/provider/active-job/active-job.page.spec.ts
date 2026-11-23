@@ -21,10 +21,14 @@ describe('ActiveJobPage completion', () => {
       getActiveJob: jasmine.createSpy().and.returnValue(job),
       ensureBelongsTo: jasmine.createSpy(), activeJob$: of(job)
     };
+    const auth = {
+      currentUser: { email: 'provider@example.test' },
+      isAuthenticated: jasmine.createSpy().and.returnValue(true)
+    };
     const page = new ActiveJobPage(router as any, {} as any, toast as any, http as any, workspace as any,
-      { currentUser: { email: 'provider@example.test' } } as any);
+      auth as any);
     page.activeJob = { ...job };
-    return { page, router, toast, http, workspace };
+    return { page, router, toast, http, workspace, auth };
   }
 
   it('closes the local job only after the backend confirms completion', async () => {
@@ -51,31 +55,60 @@ describe('ActiveJobPage completion', () => {
     expect(page.activeJob?.status).toBe(JobStatus.ON_SITE);
   });
 
-  it('does not complete a locally saved job no longer accepted for this provider', async () => {
-    const { page, http, toast, workspace, router } = pageWith(of({ success: true }));
-    workspace.getActiveJob.and.returnValue(null);
-
-    await (page as any).completeJob();
-
-    expect(http.post).not.toHaveBeenCalled();
-    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/provider/home']);
-    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
-      message: jasmine.stringMatching(/ya no figura como aceptado/), color: 'warning'
-    }));
-    expect(page.isCompleting).toBeFalse();
-  });
-
-  it('keeps the local job when the server check fails', async () => {
-    const { page, http, toast, workspace } = pageWith(of({ success: true }));
+  it('does not block completion when the accepted-jobs refresh fails', async () => {
+    const { page, http, workspace } = pageWith(of({ success: true }));
     workspace.fetchAcceptedJob.and.resolveTo(false);
 
     await (page as any).completeJob();
 
+    expect(http.post).toHaveBeenCalled();
+    expect(workspace.completeActiveJob).toHaveBeenCalled();
+    expect(workspace.fetchAcceptedJob).not.toHaveBeenCalled();
+    expect(page.isCompleting).toBeFalse();
+  });
+
+  it('refreshes stale local work after the server rejects a different provider', async () => {
+    const error = new HttpErrorResponse({ status: 403 });
+    const { page, toast, workspace } = pageWith(throwError(() => error));
+    spyOn(console, 'error');
+
+    await (page as any).completeJob();
+
+    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
+    expect(workspace.fetchAcceptedJob).toHaveBeenCalled();
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: jasmine.stringMatching(/Inicia sesión de nuevo/), color: 'danger'
+    }));
+  });
+
+  it('asks for login instead of calling completion with an expired token', async () => {
+    const { page, auth, http, toast, router, workspace } = pageWith(of({ success: true }));
+    auth.isAuthenticated.and.returnValue(false);
+
+    await (page as any).completeJob();
+
     expect(http.post).not.toHaveBeenCalled();
     expect(workspace.completeActiveJob).not.toHaveBeenCalled();
-    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({ color: 'danger' }));
+    expect(router.navigate).toHaveBeenCalledWith(['/auth/login']);
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: jasmine.stringMatching(/Tu sesión expiró/), color: 'warning'
+    }));
     expect(page.isCompleting).toBeFalse();
+  });
+
+  it('shows the backend reason for a forbidden completion', async () => {
+    const error = new HttpErrorResponse({
+      status: 403, error: { message: 'Solo proveedores pueden completar trabajos' }
+    });
+    const { page, toast, workspace } = pageWith(throwError(() => error));
+    spyOn(console, 'error');
+
+    await (page as any).completeJob();
+
+    expect(workspace.completeActiveJob).not.toHaveBeenCalled();
+    expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
+      message: 'Solo proveedores pueden completar trabajos', color: 'danger'
+    }));
   });
 
   it('explains when the backend request is not accepted yet', async () => {

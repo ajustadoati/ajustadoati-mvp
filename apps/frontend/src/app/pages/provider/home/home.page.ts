@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController, ActionSheetController } from '@ionic/angular';
-import { Subscription } from 'rxjs';
+import { Subscription, interval } from 'rxjs';
 import { BackendAuthService, BackendUserInfo } from '../../../services/backend-auth.service';
 import {
   AjustadoAtiWebSocketService,
@@ -97,6 +97,10 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     this.subscribeToWorkspaceState();
     this.subscribeToServiceRequests();
     void this.providerWorkspace.fetchAcceptedJob();
+    // Keep accepted work visible even when the WebSocket notification is missed.
+    this.subscriptions.push(interval(15000).subscribe(() => {
+      void this.providerWorkspace.fetchAcceptedJob();
+    }));
 
     // Initialize location services
     const locationReady = await this.initializeLocation();
@@ -593,7 +597,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   }
 
   get acceptedCount(): number {
-    return this.sentResponses.filter(response => response.status === 'accepted').length;
+    return this.sentResponses.filter(response => response.status === 'accepted' || response.status === 'completed').length;
   }
 
   get greetingText(): string {

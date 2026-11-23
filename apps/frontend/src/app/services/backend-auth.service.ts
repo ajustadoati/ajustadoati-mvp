@@ -127,7 +127,7 @@ export class BackendAuthService {
   }
 
   isAuthenticated(): boolean {
-    return this.currentUser$.value !== null && this.isLikelyJwt(this.authToken);
+    return this.currentUser$.value !== null && this.isUnexpiredJwt(this.authToken);
   }
 
   isProvider(): boolean {
@@ -135,7 +135,7 @@ export class BackendAuthService {
   }
 
   getJwtToken(): string | null {
-    return this.isLikelyJwt(this.authToken) ? this.authToken : null;
+    return this.isUnexpiredJwt(this.authToken) ? this.authToken : null;
   }
 
   async getUserProfile(): Promise<BackendUserInfo | null> {
@@ -201,7 +201,7 @@ export class BackendAuthService {
     try {
       const storedUser = localStorage.getItem(STORAGE_USER_KEY);
       const storedToken = localStorage.getItem(STORAGE_TOKEN_KEY);
-      if (storedUser && this.isLikelyJwt(storedToken)) {
+      if (storedUser && this.isUnexpiredJwt(storedToken)) {
         this.currentUser$.next(JSON.parse(storedUser));
         this.authToken = storedToken;
       } else {
@@ -227,5 +227,15 @@ export class BackendAuthService {
     if (!token) return false;
     const parts = token.split('.');
     return parts.length === 3 && parts[0].length > 0 && parts[1].length > 0 && parts[2].length > 0;
+  }
+
+  private isUnexpiredJwt(token: string | null | undefined): token is string {
+    if (!this.isLikelyJwt(token)) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
+    } catch {
+      return false;
+    }
   }
 }

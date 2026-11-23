@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { JobStatus } from '../interfaces/request.interface';
+import { ServiceRequest } from './ajustadoati-websocket.service';
 import { environment } from '../../environments/environment';
 import { ProviderWorkspaceService } from './provider-workspace.service';
 
@@ -64,5 +65,28 @@ describe('ProviderWorkspaceService accepted work recovery', () => {
 
     expect(await loading).toBeFalse();
     expect(service.getActiveJob()?.requestId).toBe('old');
+  });
+
+  it('updates a sent response when its request is accepted and then completed', async () => {
+    const request: ServiceRequest = {
+      id: 1, type: 'request', fromUser: 'guest+123@ajustadoati.local',
+      message: 'Ir a Tarragona', latitude: 41.18, longitude: 1.45,
+      categoryId: 12, categoryName: 'Taxi', requestId: 'request-1',
+      timestamp: new Date().toISOString()
+    };
+    service.markResponded(request, 'Puedo llevarte');
+
+    const loading = service.fetchAcceptedJob();
+    http.expectOne(`${environment.baseUrl}/providers/accepted-guest-requests`).flush({
+      success: true, data: [{ id: 'request-1', guestRef: request.fromUser,
+        categoryId: 12, categoryName: 'Taxi', message: request.message,
+        latitude: request.latitude, longitude: request.longitude,
+        maxDistanceKm: 50, status: 'accepted', createdAt: request.timestamp }]
+    });
+    await loading;
+    expect(JSON.parse(localStorage.getItem('provider_sent_responses') || '[]')[0].status).toBe('accepted');
+
+    service.completeActiveJob();
+    expect(JSON.parse(localStorage.getItem('provider_sent_responses') || '[]')[0].status).toBe('completed');
   });
 });

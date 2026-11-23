@@ -122,6 +122,10 @@ export class SearchRequestService {
   private pendingSubmission: { signature: string; id: string } | null = null;
   private submissionInFlight: Promise<SearchSession> | null = null;
 
+  prepareNewSubmission(): void {
+    this.pendingSubmission = null;
+  }
+
   async createSearchRequest(productName: string, userLocation: {lat: number, lng: number}, isGuestSearch = false): Promise<SearchSession> {
     if (this.submissionInFlight) return this.submissionInFlight;
     const message = productName.trim();
@@ -172,6 +176,7 @@ export class SearchRequestService {
       this.currentSearchSession$.next(session);
       if (isGuestSearch) this.saveGuestSearch(session);
       if (session.isActive) this.startGuestResponsePolling(request.id);
+      this.pendingSubmission = null;
       return session;
     } catch (error: any) {
       // Keep the same submission ID after a network error: the server may already have published it.

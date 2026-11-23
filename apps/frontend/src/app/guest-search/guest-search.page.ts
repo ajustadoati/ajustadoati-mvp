@@ -55,6 +55,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   private providerMarkers = new Map<string, any>();
   private lastMapSignature = '';
   private renderedResponseIds = new Set<string>();
+  private draftingNewSearch = false;
 
   constructor(
     private router: Router,
@@ -153,21 +154,37 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   openSearchModal(example?: string) {
-    if (example) {
+    if (this.currentSearchSession?.isGuestSearch && !this.draftingNewSearch) {
+      this.serviceDescription = example || '';
+      this.userLocation = null;
+      this.draftingNewSearch = true;
+    } else if (example) {
       this.serviceDescription = example;
       this.userLocation = null;
     }
     this.isSearchModalOpen = true;
-    this.modalStep = !example && this.currentSearchSession?.isGuestSearch ? 'results' : 'form';
+    this.modalStep = 'form';
     this.searchErrorMessage = '';
     this.locationErrorMessage = '';
     this.lastMapSignature = '';
     this.clearMap();
-    if (this.modalStep === 'results' && this.currentSearchSession) {
-      this.lastMapSignature = this.buildMapSignature(this.currentSearchSession);
-      setTimeout(() => this.initializeResultsMap(), 250);
-    }
     this.analytics.track('guest_open_search_modal');
+  }
+
+  openExistingSearchModal() {
+    const session = this.currentSearchSession;
+    if (!session?.isGuestSearch) return;
+    this.userLocation = {
+      lat: session.searchRequest.userLatitude,
+      lng: session.searchRequest.userLongitude
+    };
+    this.isSearchModalOpen = true;
+    this.modalStep = 'results';
+    this.searchErrorMessage = '';
+    this.locationErrorMessage = '';
+    this.clearMap();
+    this.lastMapSignature = this.buildMapSignature(session);
+    setTimeout(() => this.initializeResultsMap(), 250);
   }
 
   closeSearchModal() {
@@ -180,9 +197,13 @@ export class GuestSearchPage implements OnInit, OnDestroy {
   }
 
   backToForm() {
+    this.searchRequestService.prepareNewSubmission();
+    this.draftingNewSearch = true;
     this.modalStep = 'form';
+    this.serviceDescription = '';
     this.userLocation = null;
     this.searchErrorMessage = '';
+    this.locationErrorMessage = '';
     this.lastMapSignature = '';
     this.clearMap();
   }
@@ -245,6 +266,7 @@ export class GuestSearchPage implements OnInit, OnDestroy {
       await loading.dismiss();
 
       this.currentSearchSession = searchSession;
+      this.draftingNewSearch = false;
       this.modalStep = 'results';
       this.lastMapSignature = this.buildMapSignature(searchSession);
 

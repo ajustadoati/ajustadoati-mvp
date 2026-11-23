@@ -60,6 +60,20 @@ describe('SearchRequestService backend classification', () => {
     await retry;
   });
 
+  it('uses a new idempotency key after a successful search even with the same text', async () => {
+    const first = service.createSearchRequest('Reparar grifo', { lat: 0, lng: 0 }, true);
+    const firstRequest = http.expectOne(endpoint);
+    const firstId = firstRequest.request.body.submissionId;
+    firstRequest.flush(response);
+    await first;
+
+    const second = service.createSearchRequest('Reparar grifo', { lat: 0, lng: 0 }, true);
+    const secondRequest = http.expectOne(endpoint);
+    expect(secondRequest.request.body.submissionId).not.toBe(firstId);
+    secondRequest.flush(response);
+    await second;
+  });
+
   it('shows backend clarification instead of creating a search session', async () => {
     const pending = service.createSearchRequest('Ayuda en casa', { lat: 0, lng: 0 }, true);
     http.expectOne(endpoint).flush({ code: 'NEEDS_CLARIFICATION', message: 'Describe que necesitas reparar' },
