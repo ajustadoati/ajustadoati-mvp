@@ -28,6 +28,7 @@ export class RequestDetailPage implements OnInit, OnDestroy {
   request: ServiceRequest | null = null;
   responseForm: FormGroup;
   currentPosition: Position | null = null;
+  locationErrorMessage = '';
   isLoadingLocation = false;
   isSendingResponse = false;
   sentResponse: ProviderSentResponse | null = null;
@@ -83,15 +84,33 @@ export class RequestDetailPage implements OnInit, OnDestroy {
   }
 
   private async loadCurrentPosition() {
+    const cached = this.geolocation.getLastKnownPosition();
+    if (cached?.timestamp && Date.now() - cached.timestamp < 2 * 60_000) {
+      this.currentPosition = cached;
+      this.locationErrorMessage = '';
+      return;
+    }
     try {
       this.isLoadingLocation = true;
       this.currentPosition = await this.geolocation.getCurrentPosition();
+      this.locationErrorMessage = '';
       console.log('📍 Current position:', this.currentPosition);
     } catch (error) {
       console.error('Error loading position:', error);
-      await this.showToast('No se pudo obtener tu ubicación', 'warning');
+      this.locationErrorMessage = 'No pudimos obtener tu ubicación. Comprueba el GPS y vuelve a intentarlo.';
     } finally {
       this.isLoadingLocation = false;
+    }
+  }
+
+  async retryLocation() {
+    await this.loadCurrentPosition();
+    if (this.currentPosition && this.map) {
+      const mapElement = document.getElementById('request-map');
+      if (mapElement) {
+        this.destroyMap();
+        this.initializeMap(mapElement);
+      }
     }
   }
 
@@ -205,8 +224,15 @@ export class RequestDetailPage implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.request || !this.currentPosition) {
-      await this.showToast('Información incompleta para enviar respuesta', 'danger');
+    if (!this.request) {
+      await this.showToast('Solicitud no encontrada', 'danger');
+      return;
+    }
+    if (!this.currentPosition) {
+      await this.retryLocation();
+    }
+    if (!this.currentPosition) {
+      await this.showToast(this.locationErrorMessage, 'danger');
       return;
     }
 
@@ -254,7 +280,8 @@ ${formValues.estimatedCost ? `💰 Costo estimado: ${formValues.estimatedCost}` 
 ¿Te interesa? Respóndeme para coordinar.
       `.trim();
 
-      // Send response via WebSocket
+      // A suspended or reloaded mobile browser may have lost its previous socket.
+      await this.websocket.connect();
       this.websocket.sendProviderResponse(
         this.request.requestId,
         [this.request.fromUser],

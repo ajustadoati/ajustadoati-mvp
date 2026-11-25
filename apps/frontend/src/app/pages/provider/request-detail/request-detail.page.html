@@ -106,6 +106,12 @@
 
       <ion-card-content>
         <form [formGroup]="responseForm">
+          <div *ngIf="locationErrorMessage" class="location-warning" role="alert">
+            <p>{{ locationErrorMessage }}</p>
+            <ion-button type="button" fill="outline" size="small" [disabled]="isLoadingLocation" (click)="retryLocation()">
+              {{ isLoadingLocation ? 'Buscando ubicación...' : 'Reintentar ubicación' }}
+            </ion-button>
+          </div>
           <!-- Message -->
           <ion-item lines="full" [class.ion-invalid]="message?.invalid && message?.touched">
             <ion-label position="stacked">

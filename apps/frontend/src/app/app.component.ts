@@ -1,6 +1,17 @@
 import { Component } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { AdminService } from './services/admin.service';
+import { addIcons } from 'ionicons';
+import {
+  arrowBack, arrowBackOutline, briefcaseOutline, callOutline, carOutline,
+  cashOutline, chatboxEllipsesOutline, checkmarkCircleOutline, checkmarkDoneOutline,
+  chevronForwardOutline, constructOutline, flagOutline, homeOutline,
+  hourglassOutline, location, locationOutline, logoWhatsapp, mailUnreadOutline,
+  navigateOutline, notificationsOffOutline, notificationsOutline,
+  personCircleOutline, personOutline, phonePortraitOutline, power,
+  radioButtonOff, radioButtonOn, sendOutline, shareOutline,
+  shieldCheckmarkOutline, timeOutline, wifi, wifiOutline
+} from 'ionicons/icons';
 
 @Component({
   selector: 'app-root',
@@ -9,6 +20,16 @@ import { AdminService } from './services/admin.service';
 })
 export class AppComponent {
   constructor(private adminService: AdminService) {
+    addIcons({
+      arrowBack, arrowBackOutline, briefcaseOutline, callOutline, carOutline,
+      cashOutline, chatboxEllipsesOutline, checkmarkCircleOutline, checkmarkDoneOutline,
+      chevronForwardOutline, constructOutline, flagOutline, homeOutline,
+      hourglassOutline, location, locationOutline, logoWhatsapp, mailUnreadOutline,
+      navigateOutline, notificationsOffOutline, notificationsOutline,
+      personCircleOutline, personOutline, phonePortraitOutline, power,
+      radioButtonOff, radioButtonOn, sendOutline, shareOutline,
+      shieldCheckmarkOutline, timeOutline, wifi, wifiOutline
+    });
     // Hacer disponible el servicio de admin globalmente para desarrollo
     (window as any).adminService = this.adminService;
   }

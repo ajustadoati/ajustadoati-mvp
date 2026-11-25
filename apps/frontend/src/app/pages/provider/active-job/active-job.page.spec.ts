@@ -17,7 +17,7 @@ describe('ActiveJobPage completion', () => {
     const http = { post: jasmine.createSpy().and.returnValue(postResult) };
     const workspace = {
       updateActiveJob: jasmine.createSpy(), completeActiveJob: jasmine.createSpy(),
-      fetchAcceptedJob: jasmine.createSpy().and.resolveTo(true),
+      refreshProviderActivity: jasmine.createSpy().and.resolveTo(true),
       getActiveJob: jasmine.createSpy().and.returnValue(job),
       ensureBelongsTo: jasmine.createSpy(), activeJob$: of(job)
     };
@@ -43,7 +43,7 @@ describe('ActiveJobPage completion', () => {
     const { page, workspace } = pageWith(of({ success: true }));
     page.ngOnInit();
     expect(workspace.ensureBelongsTo).toHaveBeenCalledWith('provider@example.test');
-    expect(workspace.fetchAcceptedJob).toHaveBeenCalled();
+    expect(workspace.refreshProviderActivity).toHaveBeenCalled();
   });
 
   it('keeps the job active when the backend rejects completion', async () => {
@@ -57,13 +57,13 @@ describe('ActiveJobPage completion', () => {
 
   it('does not block completion when the accepted-jobs refresh fails', async () => {
     const { page, http, workspace } = pageWith(of({ success: true }));
-    workspace.fetchAcceptedJob.and.resolveTo(false);
+    workspace.refreshProviderActivity.and.resolveTo(false);
 
     await (page as any).completeJob();
 
     expect(http.post).toHaveBeenCalled();
     expect(workspace.completeActiveJob).toHaveBeenCalled();
-    expect(workspace.fetchAcceptedJob).not.toHaveBeenCalled();
+    expect(workspace.refreshProviderActivity).not.toHaveBeenCalled();
     expect(page.isCompleting).toBeFalse();
   });
 
@@ -75,7 +75,7 @@ describe('ActiveJobPage completion', () => {
     await (page as any).completeJob();
 
     expect(workspace.completeActiveJob).not.toHaveBeenCalled();
-    expect(workspace.fetchAcceptedJob).toHaveBeenCalled();
+    expect(workspace.refreshProviderActivity).toHaveBeenCalled();
     expect(toast.create).toHaveBeenCalledWith(jasmine.objectContaining({
       message: jasmine.stringMatching(/Inicia sesión de nuevo/), color: 'danger'
     }));

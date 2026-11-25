@@ -278,15 +278,32 @@ public class GuestRequestService {
     }
 
     public List<GuestRequestDto> getAcceptedForProvider(String providerEmail) {
+        return getRequestsForProvider(providerEmail).stream()
+                .filter(request -> "accepted".equals(request.status()) && request.acceptedResponseId() != null)
+                .toList();
+    }
+
+    /** Provider activity is rebuilt from persisted requests, never from a device's local storage. */
+    public List<GuestRequestDto> getRequestsForProvider(String providerEmail) {
+        if (providerEmail == null || providerEmail.isBlank()) return List.of();
         return sessions.values().stream()
-                .filter(session -> "accepted".equals(session.status))
-                .filter(session -> {
-                    GuestRequestResponseDto selected = selectedResponse(session);
-                    return selected != null && selected.providerEmail() != null
-                            && selected.providerEmail().equalsIgnoreCase(providerEmail);
+                .map(session -> {
+                    synchronized (session) {
+                        GuestRequestResponseDto ownResponse = session.responses.stream()
+                                .filter(response -> providerEmail.equalsIgnoreCase(response.providerEmail()))
+                                .findFirst().orElse(null);
+                        if (ownResponse == null) return null;
+                        GuestRequestResponseDto selected = selectedResponse(session);
+                        // Do not expose other providers' messages or contact details.
+                        return new GuestRequestDto(session.id, session.guestRef, session.categoryId,
+                                session.categoryName, session.message, session.latitude, session.longitude,
+                                session.maxDistanceKm, session.status, session.notifiedProviders,
+                                session.createdAt, session.updatedAt, List.of(ownResponse),
+                                selected != null && selected.id().equals(ownResponse.id()) ? selected.id() : null);
+                    }
                 })
-                .sorted((a, b) -> b.updatedAt.compareTo(a.updatedAt))
-                .map(this::toDto)
+                .filter(java.util.Objects::nonNull)
+                .sorted((a, b) -> b.updatedAt().compareTo(a.updatedAt()))
                 .toList();
     }
 
@@ -382,6 +399,15 @@ public class GuestRequestService {
         }
 
         log.info("Guest acceptance for request {} notified {} provider session(s) for {}", session.id, sent, response.providerEmail());
+        try {
+            if (webPushService.isEnabled()) {
+                profileRepository.findByEmail(response.providerEmail()).ifPresent(profile ->
+                        webPushService.sendToUser(profile.getId(), "Tu propuesta fue aceptada",
+                                session.categoryName + ": " + session.message, "/provider/home"));
+            }
+        } catch (RuntimeException exception) {
+            log.warn("Could not send acceptance push for request {}", session.id, exception);
+        }
         return sent;
     }
 

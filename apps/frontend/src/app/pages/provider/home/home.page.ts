@@ -38,6 +38,7 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   isLocationLoading = false;
   isLocationSynced = false;
   locationErrorMessage = '';
+  activityErrorMessage = '';
   isConnectedToWebSocket = false;
   isAuthenticated = false;
 
@@ -63,6 +64,15 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   private readonly handleAppInstalled = () => {
     this.deferredInstall = undefined;
     this.showInstallBanner = false;
+  };
+  private readonly handleVisibilityChange = () => {
+    if (!document.hidden && this.user) {
+      void this.refreshActivity();
+      void this.providerWorkspace.fetchPendingBacklog();
+      if (this.isAvailable && this.isLocationSynced && !this.isAuthenticated) {
+        void this.initializeWebSocket();
+      }
+    }
   };
 
   pendingRequests: ServiceRequest[] = [];
@@ -96,10 +106,12 @@ export class ProviderHomePage implements OnInit, OnDestroy {
 
     this.subscribeToWorkspaceState();
     this.subscribeToServiceRequests();
-    void this.providerWorkspace.fetchAcceptedJob();
+    this.subscribeToWebSocketState();
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    void this.refreshActivity();
     // Keep accepted work visible even when the WebSocket notification is missed.
     this.subscriptions.push(interval(15000).subscribe(() => {
-      void this.providerWorkspace.fetchAcceptedJob();
+      void this.refreshActivity();
     }));
 
     // Initialize location services
@@ -230,9 +242,22 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     this.locationSubscription = null;
     window.removeEventListener('beforeinstallprompt', this.handleInstallPrompt);
     window.removeEventListener('appinstalled', this.handleAppInstalled);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
 
     // Stop location watching
     this.geolocation.stopWatching();
+  }
+
+  ionViewWillEnter() {
+    if (this.user) {
+      void this.refreshActivity();
+      if (this.isAvailable) void this.providerWorkspace.fetchPendingBacklog();
+    }
+  }
+
+  async refreshActivity() {
+    const ok = await this.providerWorkspace.refreshProviderActivity();
+    this.activityErrorMessage = ok ? '' : 'No pudimos actualizar tus propuestas. Comprueba la conexión y vuelve a intentar.';
   }
 
   private async loadUserProfile() {
@@ -319,47 +344,32 @@ export class ProviderHomePage implements OnInit, OnDestroy {
     try {
       await this.websocket.connect();
       console.log('🔌 WebSocket connected successfully');
-
-      // Subscribe to connection status
-      const connectionSub = this.websocket.getConnectionStatus()
-        .subscribe(isConnected => {
-          this.isConnectedToWebSocket = isConnected;
-          if (isConnected) {
-            console.log('✅ WebSocket connection established');
-          } else {
-            console.log('❌ WebSocket connection lost');
-          }
-        });
-
-      // Subscribe to authentication status
-      const authSub = this.websocket.getAuthenticationStatus()
-        .subscribe(isAuth => {
-          this.isAuthenticated = isAuth;
-          console.log('🔐 WebSocket authentication status:', isAuth);
-        });
-
-      const notificationsSub = this.websocket.getNotifications()
-        .subscribe(async (notification) => {
-          if (notification.type === 'offer_accepted') {
-            const activeJob = this.providerWorkspace.handleOfferAccepted(notification);
-            if (activeJob) {
-              await this.showToast('Un cliente aceptó tu oferta. Revisa el trabajo activo para coordinar.', 'success');
-            }
-          }
-
-          if (notification.type === 'request_expired' && notification.requestId) {
-            this.providerWorkspace.removeExpiredRequest(notification.requestId);
-          }
-        });
-
-      this.subscriptions.push(connectionSub, authSub, notificationsSub);
-
     } catch (error) {
       console.error('🔌 WebSocket connection failed:', error);
       this.isConnectedToWebSocket = false;
       this.isAvailable = false;
       this.websocket.disconnect();
     }
+  }
+
+  private subscribeToWebSocketState() {
+    this.subscriptions.push(this.websocket.getConnectionStatus().subscribe(connected => {
+      this.isConnectedToWebSocket = connected;
+    }));
+    this.subscriptions.push(this.websocket.getAuthenticationStatus().subscribe(authenticated => {
+      this.isAuthenticated = authenticated;
+    }));
+    this.subscriptions.push(this.websocket.getNotifications().subscribe(async notification => {
+      if (notification.type === 'offer_accepted') {
+        const activeJob = this.providerWorkspace.handleOfferAccepted(notification);
+        if (activeJob) {
+          await this.showToast('Un cliente aceptó tu oferta. Revisa el trabajo activo para coordinar.', 'success');
+        }
+      }
+      if (notification.type === 'request_expired' && notification.requestId) {
+        this.providerWorkspace.removeExpiredRequest(notification.requestId);
+      }
+    }));
   }
 
   private subscribeToWorkspaceState() {
@@ -477,6 +487,10 @@ export class ProviderHomePage implements OnInit, OnDestroy {
   }
 
   async viewRequest(request: ServiceRequest) {
+    if (this.activeJob?.requestId === request.requestId) {
+      this.navigateToActiveJob();
+      return;
+    }
     this.router.navigate(['/provider/request-detail', request.id], {
       state: { request }
     });

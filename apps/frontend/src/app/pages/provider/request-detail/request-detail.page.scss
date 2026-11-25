@@ -239,6 +239,15 @@ ion-content {
 }
 
 // Empty State
+.location-warning {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fff4e5;
+  color: #7c3e08;
+
+  p { margin: 0 0 8px; }
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

@@ -32,6 +32,19 @@ public class ProviderController {
     private final GuestRequestService guestRequestService;
     private final ProfileRepository profileRepository;
 
+    @GetMapping("/my-requests")
+    public ResponseEntity<ApiResponse<List<GuestRequestDto>>> getMyRequests(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("No autenticado"));
+        }
+        Optional<Profile> profile = profileRepository.findByUsernameOrEmailWithCategories(
+                authentication.getName(), authentication.getName());
+        if (profile.isEmpty() || !Boolean.TRUE.equals(profile.get().getIsProvider())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Solo proveedores pueden ver sus solicitudes"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(guestRequestService.getRequestsForProvider(profile.get().getEmail())));
+    }
+
     @GetMapping("/accepted-guest-requests")
     public ResponseEntity<ApiResponse<List<GuestRequestDto>>> getAcceptedGuestRequests(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {

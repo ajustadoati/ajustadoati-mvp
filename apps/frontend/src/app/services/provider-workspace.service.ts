@@ -23,11 +23,12 @@ interface BackendGuestRequest {
   maxDistanceKm: number;
   status: string;
   createdAt: string;
+  updatedAt: string;
   acceptedResponseId?: string;
-  responses?: { id: string; providerEmail: string; providerName: string; message: string }[];
+  responses: { id: string; providerEmail: string; providerName: string; message: string; createdAt: string }[];
 }
 
-export type ProviderResponseStatus = 'sent' | 'accepted' | 'completed' | 'expired';
+export type ProviderResponseStatus = 'sent' | 'accepted' | 'completed' | 'expired' | 'not_selected';
 
 export interface ProviderSentResponse {
   id: string;
@@ -63,6 +64,7 @@ export class ProviderWorkspaceService {
   activeJob$ = this.activeJobSubject.asObservable();
 
   private http = inject(HttpClient);
+  private activityInFlight: { owner: string | null; operation: Promise<boolean> } | null = null;
 
   constructor() {
     const completedIds = new Set(this.readJobHistory().map(job => job.requestId));
@@ -111,25 +113,52 @@ export class ProviderWorkspaceService {
     }
   }
 
-  async fetchAcceptedJob(): Promise<boolean> {
+  async refreshProviderActivity(): Promise<boolean> {
+    const owner = localStorage.getItem(WORKSPACE_OWNER_KEY);
+    if (this.activityInFlight?.owner === owner) return this.activityInFlight.operation;
+    const operation = this.loadProviderActivity();
+    this.activityInFlight = { owner, operation };
     try {
+      return await operation;
+    } finally {
+      if (this.activityInFlight?.operation === operation) this.activityInFlight = null;
+    }
+  }
+
+  private async loadProviderActivity(): Promise<boolean> {
+    try {
+      const ownerAtStart = localStorage.getItem(WORKSPACE_OWNER_KEY);
       const beforeFetch = this.activeJobSubject.value;
       const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: BackendGuestRequest[] }>(`${environment.baseUrl}/providers/accepted-guest-requests`)
+        this.http.get<{ success: boolean; data: BackendGuestRequest[] }>(`${environment.baseUrl}/providers/my-requests`)
       );
       if (!response?.success || !Array.isArray(response.data)) return false;
-      if (this.activeJobSubject.value !== beforeFetch) return false;
+      if (localStorage.getItem(WORKSPACE_OWNER_KEY) !== ownerAtStart) return true;
+      if (this.activeJobSubject.value !== beforeFetch) return true;
       const existing = this.activeJobSubject.value;
       const requests = response.data;
-      const acceptedIds = new Set(requests.map(item => item.id));
-      const updatedResponses = this.sentResponsesSubject.value.map(item =>
-        item.request.requestId && acceptedIds.has(item.request.requestId) && item.status === 'sent'
-          ? { ...item, status: 'accepted' as const } : item
+      const confirmed = requests.filter(item => item.responses?.length).map(item => this.toSentResponse(item));
+      const confirmedIds = new Set(confirmed.map(item => item.request.requestId));
+      // A WebSocket send may still be committing on the server when this GET begins.
+      const optimistic = this.sentResponsesSubject.value.filter(item =>
+        !confirmedIds.has(item.request.requestId) && item.status === 'sent'
+        && Date.now() - new Date(item.sentAt).getTime() < 60_000
       );
-      if (updatedResponses.some((item, index) => item !== this.sentResponsesSubject.value[index])) {
-        this.setSentResponses(updatedResponses);
-      }
-      const request = requests.find(item => item.id === existing?.requestId) || requests[0];
+      this.setSentResponses([...confirmed, ...optimistic].sort((a, b) =>
+        new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()));
+
+      const completed = requests.filter(item => item.status === 'completed'
+        && item.acceptedResponseId === item.responses?.[0]?.id);
+      this.writeArray(JOB_HISTORY_KEY, completed.map(item => ({
+        id: `job_${item.id}`, requestId: item.id,
+        clientName: this.clientName(item.guestRef), categoryName: item.categoryName,
+        description: item.message, completedAt: item.updatedAt
+      })));
+
+      confirmedIds.forEach(id => this.removeExpiredRequest(id));
+      const accepted = requests.filter(item => item.status === 'accepted'
+        && item.acceptedResponseId === item.responses?.[0]?.id);
+      const request = accepted.find(item => item.id === existing?.requestId) || accepted[0];
       if (!request) {
         if (existing) this.setActiveJob(null);
         return true;
@@ -138,7 +167,7 @@ export class ProviderWorkspaceService {
       this.setActiveJob({
         id: `job_${request.id}`,
         requestId: request.id,
-        clientName: request.guestRef.startsWith('guest+') ? 'Cliente invitado' : request.guestRef,
+        clientName: this.clientName(request.guestRef),
         clientLocation: { latitude: request.latitude, longitude: request.longitude },
         categoryName: request.categoryName,
         description: request.message,
@@ -150,6 +179,33 @@ export class ProviderWorkspaceService {
       console.warn('No se pudo recuperar el trabajo aceptado:', error);
       return false;
     }
+  }
+
+  private clientName(guestRef: string): string {
+    return guestRef.startsWith('guest+') ? 'Cliente invitado' : guestRef;
+  }
+
+  private toSentResponse(item: BackendGuestRequest): ProviderSentResponse {
+    const own = item.responses[0];
+    const selected = item.acceptedResponseId === own.id;
+    const status: ProviderResponseStatus = item.status === 'completed' && selected ? 'completed'
+      : item.status === 'accepted' && selected ? 'accepted'
+      : ['accepted', 'completed'].includes(item.status) ? 'not_selected'
+      : item.status === 'expired' ? 'expired' : 'sent';
+    return {
+      id: own.id,
+      request: {
+        id: Date.parse(item.createdAt) || Date.now(), type: 'request',
+        fromUser: item.guestRef, message: item.message,
+        latitude: item.latitude, longitude: item.longitude,
+        categoryId: item.categoryId, categoryName: item.categoryName,
+        requestId: item.id, timestamp: item.createdAt,
+        maxDistanceKm: item.maxDistanceKm
+      },
+      message: own.message,
+      status,
+      sentAt: own.createdAt
+    };
   }
 
   /**

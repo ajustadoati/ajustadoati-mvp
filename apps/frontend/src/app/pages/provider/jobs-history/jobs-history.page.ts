@@ -1,11 +1,13 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, RefresherCustomEvent, ToastController } from '@ionic/angular';
+import { IonicModule, RefresherCustomEvent } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { JobHistoryEntry } from '../../../interfaces/request.interface';
-import { ProviderWorkspaceService } from '../../../services/provider-workspace.service';
+import { BackendAuthService } from '../../../services/backend-auth.service';
+import { ProviderSentResponse, ProviderWorkspaceService } from '../../../services/provider-workspace.service';
+
+type ActivityFilter = 'all' | 'sent' | 'accepted' | 'completed';
 
 @Component({
   selector: 'app-jobs-history',
@@ -15,119 +17,95 @@ import { ProviderWorkspaceService } from '../../../services/provider-workspace.s
   imports: [CommonModule, FormsModule, IonicModule]
 })
 export class JobsHistoryPage implements OnInit, OnDestroy {
-  jobs: JobHistoryEntry[] = [];
-  filteredJobs: JobHistoryEntry[] = [];
-  selectedFilter: 'today' | 'week' | 'month' = 'week';
-
-  // Stats
-  totalJobs = 0;
-  totalEarnings = 0;
-  averageRating = 0;
+  responses: ProviderSentResponse[] = [];
+  filteredResponses: ProviderSentResponse[] = [];
+  selectedFilter: ActivityFilter = 'all';
+  isRefreshing = false;
+  loadError = '';
 
   private subscriptions: Subscription[] = [];
 
   constructor(
     private router: Router,
-    private toastCtrl: ToastController,
+    private auth: BackendAuthService,
     private providerWorkspace: ProviderWorkspaceService
   ) {}
 
   ngOnInit() {
-    console.log('Jobs History page initialized');
-    this.loadJobHistory();
+    this.providerWorkspace.ensureBelongsTo(this.auth.currentUser?.email);
+    this.subscriptions.push(this.providerWorkspace.sentResponses$.subscribe(responses => {
+      this.responses = responses;
+      this.applyFilter();
+    }));
+    void this.refreshActivity();
+  }
+
+  ionViewWillEnter() {
+    void this.refreshActivity();
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
-  private loadJobHistory() {
-    this.jobs = this.providerWorkspace.readJobHistory();
-
-    this.applyFilter();
-    this.calculateStats();
+  get acceptedCount(): number {
+    return this.responses.filter(item => item.status === 'accepted' || item.status === 'completed').length;
   }
 
-  private calculateStats() {
-    this.totalJobs = this.filteredJobs.length;
-    this.totalEarnings = this.filteredJobs.reduce((sum, job) => sum + (job.price || 0), 0);
-
-    const ratedJobs = this.filteredJobs.filter(job => job.rating);
-    if (ratedJobs.length > 0) {
-      this.averageRating = ratedJobs.reduce((sum, job) => sum + (job.rating || 0), 0) / ratedJobs.length;
-    } else {
-      this.averageRating = 0;
-    }
+  get completedCount(): number {
+    return this.responses.filter(item => item.status === 'completed').length;
   }
 
-  onFilterChange(event: any) {
-    this.selectedFilter = event.detail.value;
+  onFilterChange(event: Event) {
+    const value = (event as CustomEvent<{ value?: string }>).detail?.value;
+    if (value !== 'all' && value !== 'sent' && value !== 'accepted' && value !== 'completed') return;
+    this.selectedFilter = value;
     this.applyFilter();
-    this.calculateStats();
   }
 
   private applyFilter() {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const monthStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    this.filteredResponses = this.responses
+      .filter(item => this.selectedFilter === 'all' || item.status === this.selectedFilter)
+      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+  }
 
-    switch (this.selectedFilter) {
-      case 'today':
-        this.filteredJobs = this.jobs.filter(job => job.completedAt >= todayStart);
-        break;
-      case 'week':
-        this.filteredJobs = this.jobs.filter(job => job.completedAt >= weekStart);
-        break;
-      case 'month':
-        this.filteredJobs = this.jobs.filter(job => job.completedAt >= monthStart);
-        break;
-      default:
-        this.filteredJobs = [...this.jobs];
+  async refreshActivity() {
+    if (this.isRefreshing) return;
+    this.isRefreshing = true;
+    try {
+      this.loadError = await this.providerWorkspace.refreshProviderActivity()
+        ? '' : 'No pudimos actualizar la actividad. Mostramos los datos guardados en este dispositivo.';
+    } finally {
+      this.isRefreshing = false;
     }
-
-    // Sort by date descending
-    this.filteredJobs.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
   }
 
-  handleRefresh(event: RefresherCustomEvent) {
-    this.loadJobHistory();
-    setTimeout(() => {
-      event.target.complete();
-      this.showToast('Historial actualizado', 'success');
-    }, 1000);
+  async handleRefresh(event: RefresherCustomEvent) {
+    try {
+      await this.refreshActivity();
+    } finally {
+      await event.target.complete();
+    }
   }
 
-  getFormattedDate(date: Date): string {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
-
-    if (days === 0) return 'Hoy';
-    if (days === 1) return 'Ayer';
-    if (days < 7) return `Hace ${days} dias`;
-
-    return date.toLocaleDateString('es-CL', {
-      day: 'numeric',
-      month: 'short'
-    });
+  statusText(status: ProviderSentResponse['status']): string {
+    switch (status) {
+      case 'accepted': return 'Aceptada';
+      case 'completed': return 'Completada';
+      case 'expired': return 'Vencida';
+      case 'not_selected': return 'No elegida';
+      default: return 'Enviada';
+    }
   }
 
-  getStarArray(rating: number): number[] {
-    return Array(5).fill(0).map((_, i) => i < rating ? 1 : 0);
+  openAcceptedJob(response: ProviderSentResponse) {
+    if (response.status === 'accepted'
+      && this.providerWorkspace.getActiveJob()?.requestId === response.request.requestId) {
+      this.router.navigate(['/provider/active-job']);
+    }
   }
 
   goBack() {
     this.router.navigate(['/provider/home']);
-  }
-
-  private async showToast(message: string, color: 'success' | 'warning' | 'danger' = 'success') {
-    const toast = await this.toastCtrl.create({
-      message,
-      duration: 2000,
-      color,
-      position: 'top'
-    });
-    await toast.present();
   }
 }

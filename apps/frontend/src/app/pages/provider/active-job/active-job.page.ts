@@ -37,7 +37,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
     console.log('Active Job page initialized');
     this.providerWorkspace.ensureBelongsTo(this.auth.currentUser?.email);
     this.loadActiveJob();
-    void this.providerWorkspace.fetchAcceptedJob();
+    void this.providerWorkspace.refreshProviderActivity();
   }
 
   ngOnDestroy() {
@@ -175,7 +175,7 @@ export class ActiveJobPage implements OnInit, OnDestroy {
       } catch (error) {
         console.error('No se pudo completar el trabajo en el backend:', error);
         if (error instanceof HttpErrorResponse && [403, 404, 409].includes(error.status)) {
-          await this.providerWorkspace.fetchAcceptedJob();
+          await this.providerWorkspace.refreshProviderActivity();
         }
         await this.showToast(this.completionErrorMessage(error), 'danger');
         return;

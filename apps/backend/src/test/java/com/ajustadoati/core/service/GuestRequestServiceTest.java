@@ -5,6 +5,7 @@ import com.ajustadoati.core.dto.CommonDto.GuestRequestDto;
 import com.ajustadoati.core.dto.CommonDto.GuestRequestResponseDto;
 import com.ajustadoati.core.dto.WebSocketDto;
 import com.ajustadoati.core.entity.Category;
+import com.ajustadoati.core.entity.Profile;
 import com.ajustadoati.core.repository.CategoryRepository;
 import com.ajustadoati.core.repository.ProfileRepository;
 import com.ajustadoati.core.websocket.ConnectionRegistry;
@@ -66,6 +67,10 @@ class GuestRequestServiceTest {
         when(categories.findById(12)).thenReturn(Optional.of(Category.builder().id(12).name("Taxi").isActive(true).build()));
         when(connections.getProviderSessions(anyInt(), anyDouble(), anyDouble(), anyDouble())).thenReturn(List.of());
         when(connections.getUserSessions(anyString())).thenReturn(List.of());
+        when(push.isEnabled()).thenReturn(true);
+        UUID providerId = UUID.randomUUID();
+        when(profiles.findByEmail("provider@example.test"))
+                .thenReturn(Optional.of(Profile.builder().id(providerId).email("provider@example.test").build()));
 
         GuestRequestService first = service();
         first.restoreRequests();
@@ -80,8 +85,11 @@ class GuestRequestServiceTest {
         var restored = restarted.getRequest(request.id());
         assertEquals("responded", restored.status());
         assertEquals(1, restored.responses().size());
+        assertEquals(1, restarted.getRequestsForProvider("provider@example.test").size());
+        assertTrue(restarted.getRequestsForProvider("other@example.test").isEmpty());
 
         restarted.acceptResponse(request.id(), restored.responses().get(0).id());
+        verify(push).sendToUser(eq(providerId), eq("Tu propuesta fue aceptada"), anyString(), eq("/provider/home"));
         assertEquals("accepted", saved.get(0).request().status());
         assertEquals(1, restarted.getAcceptedForProvider("provider@example.test").size());
         assertTrue(restarted.getAcceptedForProvider("other@example.test").isEmpty());
@@ -91,6 +99,7 @@ class GuestRequestServiceTest {
         assertEquals("completed", restarted.completeRequest(request.id(), "provider@example.test").status());
         assertEquals("completed", saved.get(0).request().status());
         assertTrue(restarted.getAcceptedForProvider("provider@example.test").isEmpty());
+        assertEquals("completed", restarted.getRequestsForProvider("provider@example.test").get(0).status());
         assertEquals("completed", restarted.completeRequest(request.id(), "provider@example.test").status());
         GuestRequestService afterCompletionRestart = service();
         afterCompletionRestart.restoreRequests();
@@ -126,6 +135,14 @@ class GuestRequestServiceTest {
         UUID selectedId = service.getRequest(request.id()).responses().stream()
                 .filter(r -> r.providerEmail().equals("first@example.test")).findFirst().orElseThrow().id();
         service.acceptResponse(request.id(), selectedId);
+        var chosenActivity = service.getRequestsForProvider("first@example.test").get(0);
+        var otherActivity = service.getRequestsForProvider("second@example.test").get(0);
+        assertEquals(1, chosenActivity.responses().size());
+        assertEquals("first@example.test", chosenActivity.responses().get(0).providerEmail());
+        assertEquals(selectedId, chosenActivity.acceptedResponseId());
+        assertEquals(1, otherActivity.responses().size());
+        assertEquals("second@example.test", otherActivity.responses().get(0).providerEmail());
+        assertNull(otherActivity.acceptedResponseId());
         assertThrows(SecurityException.class, () -> service.completeRequest(request.id(), "second@example.test"));
         assertEquals("completed", service.completeRequest(request.id(), "first@example.test").status());
         assertEquals(selectedId, saved.get(0).request().acceptedResponseId());

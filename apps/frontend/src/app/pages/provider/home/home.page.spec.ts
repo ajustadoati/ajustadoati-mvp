@@ -1,7 +1,45 @@
-import { of } from 'rxjs';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 import { ProviderHomePage } from './home.page';
 
 describe('ProviderHomePage location', () => {
+  it('observes WebSocket state even if GPS failed before the first connection', () => {
+    const connected = new BehaviorSubject(false);
+    const authenticated = new BehaviorSubject(false);
+    const notifications = new Subject<any>();
+    const removeExpiredRequest = jasmine.createSpy('removeExpiredRequest');
+    const page = new ProviderHomePage(
+      {} as any, {} as any, {} as any, {} as any, {} as any,
+      { getConnectionStatus: () => connected, getAuthenticationStatus: () => authenticated,
+        getNotifications: () => notifications } as any,
+      {} as any, { removeExpiredRequest } as any, {} as any, {} as any
+    );
+
+    (page as any).subscribeToWebSocketState();
+    connected.next(true);
+    authenticated.next(true);
+    notifications.next({ type: 'request_expired', requestId: 'old-request' });
+
+    expect(page.isConnectedToWebSocket).toBeTrue();
+    expect(page.isAuthenticated).toBeTrue();
+    expect(removeExpiredRequest).toHaveBeenCalledWith('old-request');
+  });
+
+  it('shows a retry message when server activity cannot be refreshed', async () => {
+    const refreshProviderActivity = jasmine.createSpy().and.resolveTo(false);
+    const page = new ProviderHomePage(
+      {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, { refreshProviderActivity } as any,
+      {} as any, {} as any
+    );
+
+    await page.refreshActivity();
+    expect(page.activityErrorMessage).toContain('No pudimos actualizar');
+
+    refreshProviderActivity.and.resolveTo(true);
+    await page.refreshActivity();
+    expect(page.activityErrorMessage).toBe('');
+  });
+
   it('saves the device position before using it for matching', async () => {
     const position = { latitude: 10.5, longitude: -66.9 };
     const updateProfile = jasmine.createSpy('updateProfile').and.resolveTo({

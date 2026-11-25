@@ -69,6 +69,24 @@ class ProviderGuestJobControllerTest {
     }
 
     @Test
+    void listsOnlyTheAuthenticatedProvidersOwnActivity() throws Exception {
+        when(profiles.findByUsernameOrEmailWithCategories("provider", "provider"))
+                .thenReturn(Optional.of(Profile.builder().email("provider@example.test").isProvider(true).build()));
+        when(requests.getRequestsForProvider("provider@example.test")).thenReturn(List.of());
+        mvc.perform(get("/providers/my-requests").principal(provider))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+        verify(requests).getRequestsForProvider("provider@example.test");
+    }
+
+    @Test
+    void rejectsNonProviderActivityAccess() throws Exception {
+        when(profiles.findByUsernameOrEmailWithCategories("provider", "provider"))
+                .thenReturn(Optional.of(Profile.builder().email("other@example.test").isProvider(false).build()));
+        mvc.perform(get("/providers/my-requests").principal(provider)).andExpect(status().isForbidden());
+        verify(requests, never()).getRequestsForProvider(anyString());
+    }
+
+    @Test
     void reportsDatabaseFailureWithoutClaimingCompletion() throws Exception {
         when(profiles.findByUsernameOrEmailWithCategories("provider", "provider"))
                 .thenReturn(Optional.of(Profile.builder().email("provider@example.test").isProvider(true).build()));

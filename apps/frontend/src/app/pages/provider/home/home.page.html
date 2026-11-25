@@ -60,7 +60,8 @@
   <div class="header-card">
     <h1 class="greeting">{{ greetingText }}, {{ user?.fullName || 'Proveedor' }}!</h1>
     <p class="subtitle" *ngIf="isLocationLoading">Verificando ubicación...</p>
-    <p class="subtitle" *ngIf="!isLocationLoading && isAvailable">Listo para recibir solicitudes</p>
+    <p class="subtitle" *ngIf="!isLocationLoading && isAvailable && isAuthenticated">Listo para recibir solicitudes</p>
+    <p class="subtitle" *ngIf="!isLocationLoading && isAvailable && !isAuthenticated">Reconectando para recibir solicitudes...</p>
     <p class="subtitle" *ngIf="!isLocationLoading && !isAvailable">No disponible para solicitudes</p>
 
     <!-- Availability Toggle -->
@@ -99,6 +100,11 @@
     </div>
   </div>
 
+  <div class="activity-retry" *ngIf="activityErrorMessage" role="alert">
+    <span>{{ activityErrorMessage }}</span>
+    <ion-button size="small" fill="outline" (click)="refreshActivity()">Reintentar</ion-button>
+  </div>
+
   <!-- Active Job Alert -->
   <div class="active-job-alert" *ngIf="activeJob" (click)="navigateToActiveJob()">
     <ion-card class="alert-card">
@@ -106,7 +112,7 @@
         <div class="alert-content">
           <ion-icon name="briefcase-outline" color="warning"></ion-icon>
           <div class="alert-text">
-            <h3>Trabajo Activo</h3>
+            <h3>Tu propuesta fue aceptada</h3>
             <p>{{ activeJob.categoryName }} - {{ activeJob.clientName }}</p>
           </div>
           <ion-icon name="chevron-forward-outline" color="medium"></ion-icon>
@@ -165,7 +171,7 @@
         <div class="request-footer">
           <div class="request-user">
             <ion-icon name="person-circle-outline"></ion-icon>
-            <span>{{ request.fromUser }}</span>
+            <span>{{ request.fromUser.startsWith('guest+') ? 'Cliente invitado' : request.fromUser }}</span>
           </div>
           <div class="request-distance" *ngIf="request.maxDistanceKm">
             <ion-icon name="navigate-outline"></ion-icon>
@@ -194,7 +200,8 @@
 
   <!-- Respuestas enviadas -->
   <div class="section-header">
-    <h2>Respuestas enviadas</h2>
+    <h2>Mis propuestas recientes</h2>
+    <ion-button size="small" fill="clear" (click)="navigateToJobsHistory()">Ver todas</ion-button>
   </div>
 
   <div class="responses-list" *ngIf="sentResponses.length > 0; else noResponses">
@@ -205,7 +212,8 @@
         <div class="request-header">
           <div class="request-info">
             <ion-badge [color]="response.status === 'accepted' || response.status === 'completed' ? 'success' : 'medium'">
-              {{ response.status === 'completed' ? 'Completada' : response.status === 'accepted' ? 'Aceptada' : 'Enviada' }}
+              {{ response.status === 'completed' ? 'Completada' : response.status === 'accepted' ? 'Aceptada'
+                : response.status === 'not_selected' ? 'No elegida' : response.status === 'expired' ? 'Vencida' : 'Enviada' }}
             </ion-badge>
             <p class="request-time">{{ response.sentAt | date:'short' }}</p>
           </div>
@@ -215,7 +223,7 @@
         <div class="request-footer">
           <div class="request-user">
             <ion-icon name="person-circle-outline"></ion-icon>
-            <span>{{ response.request.fromUser }}</span>
+            <span>{{ response.request.fromUser.startsWith('guest+') ? 'Cliente invitado' : response.request.fromUser }}</span>
           </div>
         </div>
       </ion-card-content>
@@ -240,8 +248,8 @@
     <ion-card class="action-card" (click)="navigateToJobsHistory()">
       <ion-card-content>
         <ion-icon name="time-outline" color="secondary" size="large"></ion-icon>
-        <h3>Historial</h3>
-        <p>Trabajos completados</p>
+        <h3>Mi actividad</h3>
+        <p>Todas mis propuestas y trabajos</p>
       </ion-card-content>
     </ion-card>
 
